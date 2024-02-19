@@ -1,0 +1,13 @@
+name = "ReactionDiffusion"
+uuid = "dcda7c7e-49c0-481c-982d-c35bedad83cd"
+authors = ["Tom Hiscock"]
+version = "1.0.0-DEV"
+
+[compat]
+julia = "1"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
