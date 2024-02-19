@@ -16,6 +16,13 @@ Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 
 [compat]
 julia = "1"
+Catalyst = "13.5"
+Combinatorics = "1.0"
+DifferentialEquations = "7.12"
+JLD2 = "0.4"
+ModelingToolkit = "8.75"
+StructArrays = "0.6"
+Symbolics = "5.18"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
