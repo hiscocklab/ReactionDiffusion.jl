@@ -1,6 +1,6 @@
 using ReactionDiffusion
 using Test
 
-@testset "ReactionDiffusion.jl" begin
-    # Write your tests here.
+@testset "Schnakenburg" begin
+    include("Schnakenburg.jl")
 end

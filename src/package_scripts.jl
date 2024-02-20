@@ -43,9 +43,9 @@ end
 function parameterSweep(model;min=0,max=1,number=10, mode="linear", var = "param")
     sweep = sweep_vals(min=min,max=max,number=number,mode=mode)
     if var == "param"
-        return Dict(zip(string.(model.ps), [sweep for i in 1:length(model.ps)]))
+        return Dict(zip(string.(parameters(model)), [sweep for i in 1:length(parameters(model))]))
     elseif var == "diffusion"
-        return Dict(zip(string.(model.states), [sweep for i in 1:length(model.states)]))
+        return Dict(zip(string.(states(model)), [sweep for i in 1:length(states(model))]))
     end
 end
 
@@ -107,7 +107,7 @@ function isTuring(J,D,q2_input)
 
     max_eig = zeros(length(q2_input))
 
-    Threads.@threads for i in 1:length(q2_input)
+    Threads.@threads for i in eachindex(q2_input)
         max_eig[i] = maximum(real(eigvals(J - diagm(q2_input[i]*D))))
     end
 
@@ -147,14 +147,14 @@ function identifyTuring(sol, ds, jacobian)
 
     idx_turing = 1
     turingParameters = Array{save_turing, 1}(undef, 0)
-    for idx_ps in 1:length(sol)
-        if SciMLBase.successful_retcode(sol[idx_ps]) && minimum(sol[idx_ps]) >= 0
-            J = jacobian(Array(sol[idx_ps]),sol[idx_ps].prob.p,0.0)
+    for solᵢ in sol
+        if SciMLBase.successful_retcode(solᵢ) && minimum(solᵢ) >= 0
+            J = jacobian(Array(solᵢ),solᵢ.prob.p,0.0)
             if computeStability(J) == 1
                 for idx_ds in 1:prod(length.(ds))
                     qmax, phase, real_max, non_oscillatory = isTuring(J,returnD(ds,idx_ds),q2)
                     if qmax > 0
-                        push!(turingParameters,save_turing(sol[idx_ps],sol[idx_ps].prob.p,returnD(ds,idx_ds),sol[idx_ps].prob.u0,phase,2*pi/qmax, real_max, non_oscillatory,idx_turing))
+                        push!(turingParameters,save_turing(solᵢ,solᵢ.prob.p,returnD(ds,idx_ds),solᵢ.prob.u0,phase,2*pi/qmax, real_max, non_oscillatory,idx_turing))
                         idx_turing = idx_turing + 1
                     end
                 end
@@ -170,10 +170,10 @@ function get_params(model, turing_param)
         error("Please input only a single parameter set, not multiple (e.g., turing_params[1] instead of turing_params)")
     else
         param = model_parameters()
-        param.reaction = Dict(zip(string.(model.ps), turing_param.reaction_params))
-        param.diffusion = Dict(zip(chop.(string.(model.states),head=0,tail=3), turing_param.diffusion_constants))
+        param.reaction = Dict(zip(string.(parameters(model)), turing_param.reaction_params))
+        param.diffusion = Dict(zip(chop.(string.(states(model)),head=0,tail=3), turing_param.diffusion_constants))
         param.domain_size = 3*turing_param.wavelength # default value
-        param.initial_condition = Dict(zip(chop.(string.(model.states),head=0,tail=3), turing_param.steady_state_values))
+        param.initial_condition = Dict(zip(chop.(string.(states(model)),head=0,tail=3), turing_param.steady_state_values))
         param.initial_noise = 0.01
         param.random_seed = 0
         return param
@@ -183,13 +183,13 @@ end
 function returnParameterSets(model, params)
     # read in parameters (ps), diffusion constants (ds), initial conditions (ics), domain sizes (ls), random seeds (seeds) and random noise (noise)
     ps = Array{Array{Float64,1},1}(undef,0)
-    for p in model.ps
+    for p in parameters(model)
         push!(ps,get!(params.reaction,string(p),[0])) ## default is zero
     end
 
     ds = Array{Array{Float64,1},1}(undef,0)
     ics = Array{Array{Float64,1},1}(undef,0)
-    for state in model.states
+    for state in states(model)
         push!(ds,get!(params.diffusion,chop(string(state), head=0,tail=3),[0])) ## default is zero
         push!(ics,get!(params.initial_condition,chop(string(state), head=0,tail=3),[1])) ## default is one
     end
@@ -202,13 +202,13 @@ end
 function returnSingleParameter(model, params)
     # read in parameters (ps), diffusion constants (ds), initial conditions (ics), domain sizes (ls), random seeds (seeds) and random noise (noise)
     ps = Array{Float64,1}(undef,0)
-    for p in model.ps
+    for p in parameters(model)
         push!(ps,get!(params.reaction,string(p),0)) ## default is zero
     end
 
     ds = Array{Float64,1}(undef,0)
     ics = Array{Float64,1}(undef,0)
-    for state in model.states
+    for state in states(model)
         push!(ds,get!(params.diffusion,chop(string(state), head=0,tail=3),0)) ## default is zero
         push!(ics,get!(params.initial_condition,chop(string(state), head=0,tail=3),1)) ## default is one
     end
@@ -222,26 +222,26 @@ function get_param(model, turing_params, name, type)
     output = Array{Float64,1}(undef,0)
     if type == "reaction"
         labels = []
-        for p in model.ps
+        for p in parameters(model)
             push!(labels,string(p))
         end
         index = findall(labels .== name)
         if length(index) == 0
             error("Please be sure to enter the correct parameter name and/or parameter type (reaction or diffusion); it should match the original definition in model")
         end
-        for i in 1:length(turing_params)
+        for i in eachindex(turing_params)
             push!(output,turing_params[i].reaction_params[index][1])
         end
     elseif type == "diffusion"
         labels = []
-        for state in model.states
+        for state in states(model)
             push!(labels,chop(string(state), head=0,tail=3))
         end
         index = findall(labels .== name)
         if length(index) == 0
             error("Please be sure to enter the correct parameter name and/or parameter type (reaction or diffusion); it should match the original definition in model")
         end
-        for i in 1:length(turing_params)
+        for i in eachindex(turing_params)
             push!(output,turing_params[i].diffusion_constants[index][1])
         end
     end
@@ -252,8 +252,8 @@ function returnTuringParams(model, params; maxiters = 1e3,alg=Rodas5(),abstol=1e
 
     # read in parameters (ps), diffusion constants (ds), and initial conditions (ics)
     ps,ds,ics, _, _, _ = returnParameterSets(model, params)
-    n_params = length(model.ps)
-    n_species = length(model.states)
+    n_params = length(parameters(model))
+    n_species = length(states(model))
 
     # convert reaction network to ODESystem
     odesys = convert(ODESystem, model)
@@ -322,8 +322,8 @@ end
 
 function simulate(model,param;alg=KenCarp4(),reltol=1e-6,abstol=1e-8, dt = 0.1, maxiters = 1e3, save_everystep = true)
 
-    n_params = length(model.ps)
-    n_species = length(model.states)
+    n_params = length(parameters(model))
+    n_species = length(states(model))
 
     p,d,ic, l, seed, noise = returnSingleParameter(model, param)
 

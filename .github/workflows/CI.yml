@@ -17,7 +17,7 @@ jobs:
         group:
           - Core
         version:
-          - '1'
+          - '1' #this will use latest stable v1.x.y version; if break, can go to CI to look at previous successful builds
         julia-threads:
           - '1'
           - '2'
