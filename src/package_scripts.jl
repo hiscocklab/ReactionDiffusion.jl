@@ -24,8 +24,11 @@ mutable struct model_parameters
     
 end
 
+"""
+    screen_values(;min=0,max=1,number=10, mode="linear")
 
-
+Return double the number `x` plus `1`.
+"""
 function screen_values(;min=0,max=1,number=10, mode="linear")
     if number > 1
         if mode == "linear"
