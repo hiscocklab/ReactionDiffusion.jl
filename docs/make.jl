@@ -23,4 +23,4 @@ makedocs(sitename="ReactionDiffusion.jl",
 
 
 #run in Julia repl using: include("make.jl")
-#if adding docstrings, these are only updated once you restart Julia
+#if adding docstrings, these are only updated once you restart Julia (maybe Revise.jl has taken care of this?)

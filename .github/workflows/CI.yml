@@ -1,40 +1,42 @@
-# name: CI
-# on:
-#   pull_request:
-#     branches:
-#       - master
-#   push:
-#     branches:
-#       - master 
-# jobs:
-#   test:
-#     name: Julia ${{ matrix.version }} - ${{ matrix.julia-threads }} thread(s) - ${{ github.event_name }}
-#     runs-on: ubuntu-latest
-#     env:
-#       JULIA_NUM_THREADS: ${{ matrix.julia-threads }}
-#     strategy:
-#       matrix:
-#         group:
-#           - Core
-#         version:
-#           - '1' #this will use latest stable v1.x.y version; if break, can go to CI to look at previous successful builds
-#         julia-threads:
-#           - '1'
-#           - '2'
-#     steps:
-#       - uses: actions/checkout@v4
-#       - uses: julia-actions/setup-julia@v1
-#         with:
-#           version: ${{ matrix.version }}
-#       - uses: actions/cache@v4
-#         env:
-#           cache-name: cache-artifacts
-#         with:
-#           path: ~/.julia/artifacts
-#           key: ${{ runner.os }}-test-${{ env.cache-name }}-${{ hashFiles('**/Project.toml') }}
-#           restore-keys: |
-#             ${{ runner.os }}-test-${{ env.cache-name }}-
-#             ${{ runner.os }}-test-
-#             ${{ runner.os }}-
-#       - uses: julia-actions/julia-buildpkg@v1
-#       - uses: julia-actions/julia-runtest@v1
+name: CI
+on:
+  pull_request:
+    branches:
+      - master
+      - test
+  push:
+    branches:
+      - master
+      - test
+jobs:
+  test:
+    name: Julia ${{ matrix.version }} - ${{ matrix.julia-threads }} thread(s) - ${{ github.event_name }}
+    runs-on: ubuntu-latest
+    env:
+      JULIA_NUM_THREADS: ${{ matrix.julia-threads }}
+    strategy:
+      matrix:
+        group:
+          - Core
+        version:
+          - '1' #this will use latest stable v1.x.y version; if break, can go to CI to look at previous successful builds
+        julia-threads:
+          - '1'
+          - '2'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v1
+        with:
+          version: ${{ matrix.version }}
+      - uses: actions/cache@v4
+        env:
+          cache-name: cache-artifacts
+        with:
+          path: ~/.julia/artifacts
+          key: ${{ runner.os }}-test-${{ env.cache-name }}-${{ hashFiles('**/Project.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-test-${{ env.cache-name }}-
+            ${{ runner.os }}-test-
+            ${{ runner.os }}-
+      - uses: julia-actions/julia-buildpkg@v1
+      - uses: julia-actions/julia-runtest@v1
