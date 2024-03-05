@@ -3,9 +3,11 @@ on:
   pull_request:
     branches:
       - master
+      - test
   push:
     branches:
       - master
+      - test
 jobs:
   test:
     name: Julia ${{ matrix.version }} - ${{ matrix.julia-threads }} thread(s) - ${{ github.event_name }}
