@@ -1,23 +1,3 @@
-name = "ReactionDiffusionDocs"
-
 [deps]
-Catalyst = "479239e8-5488-4da2-87a7-35f2df7eef83"
-Combinatorics = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
-DifferentialEquations = "0c46a032-eb83-5123-abaf-570d42b7fbaa"
-Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
-JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
-LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
-ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
-Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
-StructArrays = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
-Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
-
-[compat]
-Catalyst = "13.5"
-Combinatorics = "1.0"
-DifferentialEquations = "7.12"
-JLD2 = "0.4"
-ModelingToolkit = "8.75"
-StructArrays = "0.6"
-Symbolics = "5.18"
-julia = "1.10"
+ReactionDiffusion = "dcda7c7e-49c0-481c-982d-c35bedad83cd"
+ReactionDiffusionPlots = "6e8808cc-c1a9-444c-bddd-c78fe00a1612"
