@@ -1,4 +1,4 @@
 # Determine pattern-forming parameter sets
 
-
-refer to catalyst.jl
+- Explain returnTuringParams()
+- explain that the first 
