@@ -1,13 +1,12 @@
 **NOTE: change the logo.png and favicon.ico images.** Currently these are from Catalyst.jl. Design a new logo - idea: 3 julia colors as nodes of a reaction-diffusion network?
 
 **NOTE: one BIG think we need to do before starting the documentation**
-We need to work out how to handle plotting.
-We have two options
-1. write a separate package `ReactionDiffusionPlots` using `Makie.jl`. **PREFERRED**
-2. somehow copy and paste the helper plotting scripts that you use, along with `Plots.jl`, and just say on the documentation "write your own plotting scripts"
-    - I think it's helpful to fully document the simulation outputs so people know what they are and how they would plot it
 
-The advantage of number 2 is that it is more customizable. The disadvantage is that it is more complicated to explain! It would be nice if we could just `add ReactionDiffusionPlots` and it worked. However, `Plots.jl` is notoriously fiddly with dependencies - I have not managed to get it working as a package dependency. `Makie.jl` is the future! So we would need to convert our helper functions into `Makie.jl` and make all the plots using these helper functions. I think this wouldn't be too difficult, but we can discuss.
+We need to work out how to handle plotting.
+
+I do not want to force users to load any plotting packages (e.g., Plots.jl, Makie.jl). These can be buggy and are liable to change frequently.
+
+Instead, can we write helper functions that make plotting **as simple as possible**. Currently I have some functions in `plotting_scripts.jl`. But these require `Plots.jl` to be loaded. Can you think of a nice, intuitive helper function that would allow us to plot things easily?
 
 # ReactionDiffusion.jl for modelling biological systems
 
