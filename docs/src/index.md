@@ -1,3 +1,5 @@
+**NOTE: there are issues with speed!!** Currently, the package version of the scripts runs much slower than the `include("scripts.jl")` version of the script, particularly for large parameter sweeps (it grows exponentially bad the larger the parameter space screened). We need to fix this or change strategy!! If we move the symbolics stuff outside of the functions and run it locally the speed is much better. **We should still release `ReactionDiffusion.jl` as it is, but make sure to flag Daniel's github account and show the optimized version of running it (and how to download and implement it) and that we are working on optimizing the speed of this package.**
+
 **NOTE: change the logo.png and favicon.ico images.** Currently these are from Catalyst.jl. Design a new logo - idea: 3 julia colors as nodes of a reaction-diffusion network?
 
 **NOTE: one BIG think we need to do before starting the documentation**
