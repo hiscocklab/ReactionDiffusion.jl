@@ -303,7 +303,7 @@ function returnTuringParams(model, params; maxiters = 1e3,alg=Rodas5(),abstol=1e
     prob = SteadyStateProblem(prob_fn,u₀,p)
     ensemble_prob = EnsembleProblem(prob,prob_func=prob_func)
 
-    sol = solve(ensemble_prob,maxiters=maxiters,DynamicSS(alg; tspan=tspan),ensemblealg,trajectories=prod([length.(ps); length.(ics)]),verbose=false,abstol=abstol, reltol=reltol)
+    sol = solve(ensemble_prob,maxiters=maxiters,DynamicSS(alg; tspan=tspan),ensemblealg,trajectories=prod([length.(ps); length.(ics)]),verbose=false,abstol=abstol, reltol=reltol, save_everystep=false)
 
     # Determine whether the steady state undergoes a diffusion-driven instability
     turing_params = identifyTuring(sol, ds, jacobian)
