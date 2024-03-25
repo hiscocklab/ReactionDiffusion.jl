@@ -1,4 +1,3 @@
 # Specify the parameter values
 
-
-refer to catalyst.jl
+Explain how to define params

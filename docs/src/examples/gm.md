@@ -1,6 +1,6 @@
 # Gierer-Meinhardt model
 
-including: VScode+ extensions, Julia, pkg, threads
+Show code and show agreement with theory
 
 
 
