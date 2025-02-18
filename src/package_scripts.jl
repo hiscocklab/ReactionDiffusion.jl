@@ -251,7 +251,7 @@ function get_param(model, turing_params, name, type)
     return output
 end
 
-function returnTuringParams(model, params; maxiters = 1e3,alg=Rodas5(),abstol=1e-8, reltol=1e-6, tspan=1e4,ensemblealg=EnsembleThreads())
+function returnTuringParams(model, params; maxiters = 1e3,alg=Rodas5(),abstol=1e-8, reltol=1e-6, tspan=1e4,ensemblealg=EnsembleThreads(),batch_size=1e4)
 
     # read in parameters (ps), diffusion constants (ds), and initial conditions (ics)
     ps,ds,ics, _, _, _ = returnParameterSets(model, params)
@@ -285,15 +285,13 @@ function returnTuringParams(model, params; maxiters = 1e3,alg=Rodas5(),abstol=1e
                 parallel=Symbolics.SerialForm(),expression = Val{false})[2]) #index [2] denotes in-place, mutating function
 
 
-    # Construct function to screen through parameters
-    function prob_func(prob,i,repeat)
-      tmp1, tmp2 = returnParam(ps,ics,i)
-      @. prob.u0 = tmp2
-      @. prob.p = tmp1
-      return prob
-    end
-    
-    # Define and solve EnsembleProblem to find steady state values
+    # separate parameter screen into batches
+    turing_params = Array{save_turing, 1}(undef, 0)
+    n_total = prod([length.(ps); length.(ics)])
+    n_batches = Int(ceil(n_total/batch_size))
+    progressMeter = Progress(n_batches; desc="Screening parameter sets: ",dt=0.1, barglyphs=BarGlyphs("[=> ]"), barlen=50, color=:yellow)
+ 
+    # Define the steady state problem
 
     p = zeros(Float64,length(ps))
     u₀ = zeros(Float64,length(ics))
@@ -301,19 +299,40 @@ function returnTuringParams(model, params; maxiters = 1e3,alg=Rodas5(),abstol=1e
     prob_fn = ODEFunction((du,u,p,t)->fₛₛ(du,vec(u),p), jac = (du,u,p,t) -> fjacₛₛ(du,vec(u),p), jac_prototype = similar(jacₛₛ,Float64))
 
     prob = SteadyStateProblem(prob_fn,u₀,p)
-    ensemble_prob = EnsembleProblem(prob,prob_func=prob_func)
 
-    sol = solve(ensemble_prob,maxiters=maxiters,DynamicSS(alg; tspan=tspan),ensemblealg,trajectories=prod([length.(ps); length.(ics)]),verbose=false,abstol=abstol, reltol=reltol, save_everystep=false)
 
-    # Determine whether the steady state undergoes a diffusion-driven instability
-    turing_params = identifyTuring(sol, ds, jacobian)
-
-    # Output simple diagnostics
-    n_iter = prod([length.(ps); length.(ics); length.(ds)])
-    show(stdout, MIME"text/plain"(), string("Robustness: ", round(100*length(turing_params)/n_iter),"%  (",length(turing_params),"/",n_iter,")"))
+    for batch_number in 1:n_batches
+        starting_index = (batch_number - 1)*batch_size
+        final_index = min(batch_number*batch_size,n_total)
+        n_batch = final_index - starting_index
+        append!(turing_params,returnTuringParams_batch_single(n_batch, starting_index, ps, ds, ics, prob, jacobian; maxiters = maxiters,alg=alg,abstol=abstol, reltol=reltol, tspan=tspan,ensemblealg=ensemblealg))
+        next!(progressMeter)
+    end
+    println(string(length(turing_params),"/",n_total," parameters are pattern forming"))
 
     return turing_params
 end
+
+function returnTuringParams_batch_single(n_batch, starting_index, ps, ds, ics, prob, jacobian; maxiters = maxiters,alg=alg,abstol=abstol, reltol=reltol, tspan=tspan,ensemblealg=ensemblealg)
+
+    # Construct function to screen through parameters
+    function prob_func(prob,i,repeat)
+      tmp1, tmp2 = returnParam(ps,ics,(i+starting_index))
+      @. prob.u0 = tmp2
+      @. prob.p = tmp1
+      return prob
+    end
+    
+    ensemble_prob = EnsembleProblem(prob,prob_func=prob_func)
+
+    sol = solve(ensemble_prob,maxiters=maxiters,DynamicSS(alg; tspan=tspan),ensemblealg,trajectories=n_batch,verbose=false,abstol=abstol, reltol=reltol, save_everystep = false)
+
+    # Determine whether the steady state undergoes a diffusion-driven instability
+    return identifyTuring(sol, ds, jacobian)
+
+end
+
+
 
 function createIC(ic, seed, noise)
     if seed > 0
