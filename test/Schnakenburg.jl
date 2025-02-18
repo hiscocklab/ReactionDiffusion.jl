@@ -18,7 +18,7 @@ params.diffusion["U"] = [1.0]
 params.diffusion["V"] = [50.0]
 
 
-turing_params = returnTuringParams(model, params);
+turing_params = returnTuringParams(model, params,batch_size=2);
 a = get_param(model, turing_params,"a","reaction")
 b = get_param(model, turing_params,"b","reaction")
 
