@@ -310,7 +310,7 @@ function returnTuringParams(model, params; maxiters = 1e3,alg=Rodas5(),abstol=1e
     end
     println(string(length(turing_params),"/",n_total," parameters are pattern forming"))
 
-    return turing_params
+    return StructArray(turing_params)
 end
 
 function returnTuringParams_batch_single(n_batch, starting_index, ps, ds, ics, prob, jacobian; maxiters = maxiters,alg=alg,abstol=abstol, reltol=reltol, tspan=tspan,ensemblealg=ensemblealg)
