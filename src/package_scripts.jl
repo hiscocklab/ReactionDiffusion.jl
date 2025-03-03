@@ -399,6 +399,76 @@ function simulate(model,param;alg=KenCarp4(),reltol=1e-6,abstol=1e-8, dt = 0.1, 
 
 end
 
+struct endpoint end
+
+# This is all we define.  It uses a familiar signature, but strips it apart
+# in order to add a custom definition to the internal method `RecipesBase.apply_recipe`
+@recipe function plot(::endpoint, model, sol)
+    pattern = last(sol)
+    x = range(0,1, length = size(pattern,1))
+    labels = []
+    for state in model.states
+        push!(labels,chop(string(state), head=0,tail=3))
+    end
+
+    pattern = pattern ./ maximum(pattern,dims=1)
+
+    labels --> reshape(labels,1,length(labels))
+    ticks --> :none
+    leg --> Symbol(:outer,:right)
+    linewidth --> 2
+    x, pattern
+
+
+end
+
+
+
+
+struct timepoint end
+
+@recipe function plot(::timepoint, model, sol, t)
+    if t > 1 || t < 0
+        error("Time should be between 0 and 1, representing first and last simulation timepoints respectively)")
+    end
+
+    if t == 0
+        t = 1e-20
+    end
+
+    x = range(0,1, length = size(last(sol),1))    
+    labels = []
+    for state in model.states
+        push!(labels,chop(string(state), head=0,tail=3))
+    end
+    labels = reshape(labels,1,length(labels))
+    tfinal = sol.t[Int(ceil(t*length(sol.t)))]
+    tspan = range(0,tfinal,100)
+    normalization_factor = maximum(last(sol),dims=1)
+    for t_i in tspan
+        normalization_factor = max(vec(normalization_factor),vec(maximum(sol(t_i),dims=1)))
+    end
+    normalization_factor = reshape(normalization_factor,1,length(normalization_factor))
+
+
+    pattern = sol(tfinal)
+
+    pattern = pattern ./ normalization_factor
+
+    labels --> reshape(labels,1,length(labels))
+    ticks --> :none
+    leg --> Symbol(:outer,:right)
+    linewidth --> 2
+
+    x,pattern
+
+end
+
+
+
+
+
+
 
 
 
