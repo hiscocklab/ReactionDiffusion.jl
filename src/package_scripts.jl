@@ -1,22 +1,54 @@
+"""
+$(TYPEDEF)
+
+An object that records parameter sets that undergo a Turing instability.
+
+$(FIELDS)
+
+
+"""
 mutable struct save_turing
+    """The computed steady state values of each variable"""
     steady_state_values::Vector{Float64}
+    """The reaction parameters"""
     reaction_params::Vector{Float64}
+    """The diffusion constants"""
     diffusion_constants::Vector{Float64}
+    """The initial conditions of each variable used to compute the steady state values"""
     initial_conditions::Vector{Float64}
+    """The predicted phase of each of the variables in the final pattern. `[1 1]` would be in-phase, `[1 -1]` would be out-of-phase"""
     pattern_phase::Vector{Int64}
+    """The wavelength that is maximally unstable"""
     wavelength::Float64
+    """The maximum real eigenvalue associated with the Turing instability"""
     max_real_eigval::Float64
+    """If `true`, this parameter set represents a stationary Turing pattern. If `false`, the unstable mode has complex eigenvalues and thus may be oscillatory. """
     non_oscillatory::Bool
+    """An index used to record the pattern-forming parameters"""
     idx_turing::Int64
 end
 
 
+"""
+$(TYPEDEF)
+
+An object that records parameter values for `model` simulations
+
+$(FIELDS)
+
+"""
 mutable struct model_parameters
+    """reaction parameters"""
     reaction
+    """diffusion constants"""
     diffusion
+    """values of each of the variables used for homogeneous initial conditions"""
     initial_condition
+    """level of (normally distributed) noise added to the homogeneous initial conditions"""
     initial_noise
+    """size of 1D domain"""
     domain_size
+    """seed associated with random number generation; only set this when you need to reproduce exact simulations each run"""
     random_seed
     function model_parameters()
         return new(Dict(),Dict(),Dict(),0.01,[1.0],[1])
@@ -27,7 +59,7 @@ end
 """
     screen_values(;min=0,max=1,number=10, mode="linear")
 
-Return double the number `x` plus `1`.
+Returns a series of `num_params` parameter values that are linearly spaced between the `min` and `max` limits. The argument `mode="log"` may be used to sample in log-space instead. 
 """
 function screen_values(;min=0,max=1,number=10, mode="linear")
     if number > 1
@@ -43,14 +75,6 @@ function screen_values(;min=0,max=1,number=10, mode="linear")
     end
 end
 
-function parameterSweep(model;min=0,max=1,number=10, mode="linear", var = "param")
-    sweep = sweep_vals(min=min,max=max,number=number,mode=mode)
-    if var == "param"
-        return Dict(zip(string.(parameters(model)), [sweep for i in 1:length(parameters(model))]))
-    elseif var == "diffusion"
-        return Dict(zip(string.(states(model)), [sweep for i in 1:length(states(model))]))
-    end
-end
 
 const nq = 100
 const q2 = 10 .^(range(-2,stop=2,length=nq))
@@ -59,7 +83,6 @@ const n_gridpoints = 128
 const M = Array(Tridiagonal([1.0 for i in 1:n_gridpoints-1],[-2.0 for i in 1:n_gridpoints],[1.0 for i in 1:n_gridpoints-1]))
 M[1,2] = 2.0
 M[end,end-1] = 2.0
-
 
         
 function returnParam(ps,ics, i)
@@ -167,7 +190,14 @@ function identifyTuring(sol, ds, jacobian)
     return StructArray(turingParameters)
 end
 
+"""
+    get_params(model, turing_param)
 
+For a given `model` and a *single* pattern-forming parameter set, `turing_param`, this function creates a  corresponding `model_parameters` variable. This sets, by default, the `model_parameters` fields:
+- `domain_size`: chosen to be 3x the computed pattern wavelength, i.e., `3*turing_param.wavelength`
+- `initial_condition`: chosen to be the computed steady state values, i.e.,  `turing_param.steady_state_values`
+- `initial_noise = 0.01`: the magnitude of noise (normally distributed random numbers) added to the steady state values to define the initial conditions.
+"""
 function get_params(model, turing_param)
     if length(turing_param.wavelength) > 1
         error("Please input only a single parameter set, not multiple (e.g., turing_params[1] instead of turing_params)")
@@ -221,6 +251,19 @@ function returnSingleParameter(model, params)
     return ps,ds,ics, ls, seeds, noise
 end
 
+
+"""
+    get_param(model, turing_params, name, type)
+
+For a given `model` and a (potentially large) number of pattern-forming parameter sets, `turing_params`, this function extracts the parameter values prescribed by the input `name`. For reaction parameters, used `type="reaction"`, for diffusion constants, use `type="diffusion"`.
+
+Example:
+
+```julia
+δ₁ = get_param(model, turing_params,"δ₁","reaction")
+D_COMPLEX = get_param(model, turing_params,"COMPLEX","diffusion")
+```
+"""
 function get_param(model, turing_params, name, type)
     output = Array{Float64,1}(undef,0)
     if type == "reaction"
@@ -251,6 +294,26 @@ function get_param(model, turing_params, name, type)
     return output
 end
 
+"""
+    returnTuringParams(model, params; maxiters = 1e3,alg=Rodas5(),abstol=1e-8, reltol=1e-6, tspan=1e4,ensemblealg=EnsembleThreads(),batch_size=1e4)
+
+Return a `save_turing` object of parameters that are predicted to be pattern forming.
+
+Required inputs:
+- `model`: specified via the `@reaction_network` macro
+- `params`: all reaction and diffusion parameters, in a `model_parameters` object
+
+Optional inputs:
+- `batch_size`: the number of parameter sets to consider at once. Increasing/decreasing from the default value may improve speed.  
+
+Inputs carried over from DifferentialEquations.jl; see [here](https://docs.sciml.ai/DiffEqDocs/stable/) for further details:
+- `maxiters`: maximum number of iterations to reach steady state (otherwise simulation terminates)
+- `alg`: ODE solver algorithm
+- `abstol` and `reltol`: tolerance levels of solvers
+- `tspan`: maximum time allowed to reach steady state (otherwise simulation terminates)
+- `ensemblealg`: ensemble simulation method
+
+"""
 function returnTuringParams(model, params; maxiters = 1e3,alg=Rodas5(),abstol=1e-8, reltol=1e-6, tspan=1e4,ensemblealg=EnsembleThreads(),batch_size=1e4)
 
     # read in parameters (ps), diffusion constants (ds), and initial conditions (ics)
@@ -308,7 +371,7 @@ function returnTuringParams(model, params; maxiters = 1e3,alg=Rodas5(),abstol=1e
         append!(turing_params,returnTuringParams_batch_single(n_batch, starting_index, ps, ds, ics, prob, jacobian; maxiters = maxiters,alg=alg,abstol=abstol, reltol=reltol, tspan=tspan,ensemblealg=ensemblealg))
         next!(progressMeter)
     end
-    println(string(length(turing_params),"/",n_total," parameters are pattern forming"))
+    println(string(length(turing_params),"/",prod([length.(ps); length.(ics); length.(ds)])," parameters are pattern forming"))
 
     return StructArray(turing_params)
 end
@@ -342,6 +405,23 @@ function createIC(ic, seed, noise)
     @. output = (ic' .* output) * abs(noise*randn() + 1)
 end
 
+"""
+    simulate(model,param;alg=KenCarp4(),reltol=1e-6,abstol=1e-8, dt = 0.1, maxiters = 1e3, save_everystep = true)
+
+Simulate `model` for a single parameter set `param`.
+
+Required inputs:
+- `model`: specified via the `@reaction_network` macro
+- `param`: all reaction and diffusion parameters, in a `model_parameters` object. *This must be a single parameter set only* 
+
+Inputs carried over from DifferentialEquations.jl; see [here](https://docs.sciml.ai/DiffEqDocs/stable/) for further details:
+- `maxiters`: maximum number of iterations to reach steady state (otherwise simulation terminates)
+- `alg`: solver algorithm
+- `abstol` and `reltol`: tolerance levels of solvers
+- `dt`: initial value for timestep
+- `save_everystep`: controls whether all timepoints are saved, defaults to `true`
+ 
+"""
 function simulate(model,param;alg=KenCarp4(),reltol=1e-6,abstol=1e-8, dt = 0.1, maxiters = 1e3, save_everystep = true)
 
     n_params = length(parameters(model))
@@ -401,8 +481,7 @@ end
 
 struct endpoint end
 
-# This is all we define.  It uses a familiar signature, but strips it apart
-# in order to add a custom definition to the internal method `RecipesBase.apply_recipe`
+
 @recipe function plot(::endpoint, model, sol)
     pattern = last(sol)
     x = range(0,1, length = size(pattern,1))
