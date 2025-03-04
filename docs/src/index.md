@@ -72,8 +72,6 @@ Then, with a single line of code, we can perform a Turing instability analysis a
 turing_params = returnTuringParams(model, params);
 ```
 
-**NEED TO UPDATE VERSION, TOTAL NUMBER OF PARAMETERS IS INCORRECT**
-
 This returns all parameter combinations that can break symmetry from a homogeneous initial condition. We take advantage of the highly performant numerical solvers in [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl) to be able to simulate millions of parameter sets per minute on a standard laptop. 
 
 We may then take a single parameter set and simulate its spatiotemporal dynamics directly, using `Plots.jl` to visualize the resulting pattern:
