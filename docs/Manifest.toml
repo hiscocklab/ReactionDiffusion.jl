@@ -1922,9 +1922,9 @@ version = "1.6.0"
 
 [[deps.ReactionDiffusion]]
 deps = ["Catalyst", "Combinatorics", "DifferentialEquations", "JLD2", "LinearAlgebra", "ModelingToolkit", "ProgressMeter", "Random", "RecipesBase", "StructArrays", "Symbolics"]
-git-tree-sha1 = "4f73d351ef21880be861332602eb31a2ab5dcd02"
+git-tree-sha1 = "f6ed45b477848c3407ee11734077a861e70131db"
 uuid = "dcda7c7e-49c0-481c-982d-c35bedad83cd"
-version = "0.1.5"
+version = "0.1.6"
 
 [[deps.RecipesBase]]
 deps = ["PrecompileTools"]
