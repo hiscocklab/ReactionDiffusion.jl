@@ -1,54 +1,54 @@
 """
-$(TYPEDEF)
+    struct save_turing
 
 An object that records parameter sets that undergo a Turing instability.
 
-$(FIELDS)
+This has the following fields:
 
+- `steady_state_values`: The computed steady state values of each variable
+- `reaction_params`: The reaction parameters
+- `diffusion_constants`: The diffusion constants
+- `initial_conditions`: The initial conditions of each variable used to compute the steady state values
+- `pattern_phase: The predicted phase of each of the variables in the final pattern. `[1 1]` would be in-phase, `[1 -1]` would be out-of-phase
+- `wavelength`: The wavelength that is maximally unstable
+- `max_real_eigval`: The maximum real eigenvalue associated with the Turing instability
+- `non_oscillatory`: If `true`, this parameter set represents a stationary Turing pattern. If `false`, the unstable mode has complex eigenvalues and thus may be oscillatory.
 
 """
 mutable struct save_turing
-    """The computed steady state values of each variable"""
     steady_state_values::Vector{Float64}
-    """The reaction parameters"""
     reaction_params::Vector{Float64}
-    """The diffusion constants"""
     diffusion_constants::Vector{Float64}
-    """The initial conditions of each variable used to compute the steady state values"""
     initial_conditions::Vector{Float64}
-    """The predicted phase of each of the variables in the final pattern. `[1 1]` would be in-phase, `[1 -1]` would be out-of-phase"""
     pattern_phase::Vector{Int64}
-    """The wavelength that is maximally unstable"""
     wavelength::Float64
-    """The maximum real eigenvalue associated with the Turing instability"""
     max_real_eigval::Float64
-    """If `true`, this parameter set represents a stationary Turing pattern. If `false`, the unstable mode has complex eigenvalues and thus may be oscillatory. """
     non_oscillatory::Bool
-    """An index used to record the pattern-forming parameters"""
     idx_turing::Int64
 end
 
 
 """
-$(TYPEDEF)
+    struct model_parameters
 
 An object that records parameter values for `model` simulations
 
-$(FIELDS)
+This has the following fields:
+
+-`reaction`: reaction parameters
+-`diffusion`: diffusion constants
+-`initial_condition`: values of each of the variables used for homogeneous initial conditions
+-`initial_noise`: level of (normally distributed) noise added to the homogeneous initial conditions
+-`domain_size`: size of 1D domain
+-`random_seed`: seed associated with random number generation; only set this when you need to reproduce exact simulations each run
 
 """
 mutable struct model_parameters
-    """reaction parameters"""
     reaction
-    """diffusion constants"""
     diffusion
-    """values of each of the variables used for homogeneous initial conditions"""
     initial_condition
-    """level of (normally distributed) noise added to the homogeneous initial conditions"""
     initial_noise
-    """size of 1D domain"""
     domain_size
-    """seed associated with random number generation; only set this when you need to reproduce exact simulations each run"""
     random_seed
     function model_parameters()
         return new(Dict(),Dict(),Dict(),0.01,[1.0],[1])
