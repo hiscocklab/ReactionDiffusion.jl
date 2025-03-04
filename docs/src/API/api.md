@@ -1,25 +1,23 @@
 # API for ReactionDiffusion.jl
 
-TOM WILL DO THIS: explain philosophy of package - easy-to-code, well-chosen defaults, fast, optimized. Built on SciML. Not as modular and extensible.
+ReactionDiffusion aims to be an easy-to-use *and* computationally-efficient pipeline to simulate biologically-inspired reaction-diffusion models. It is our hope that models can be built with just a few lines of code and solved without the user having any knowledge of PDE solver methods. 
 
-## Interoperability with SciML packages
+This is achieved by drawing from a range of numerical routines from the SciML packages, including [Catalyst.jl](https://github.com/SciML/Catalyst.jl), [Symbolics.jl](https://github.com/JuliaSymbolics/Symbolics.jl), [ModelingToolkit.jl](https://github.com/SciML/ModelingToolkit.jl), and [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl). Currently, there are limited options to customize the simulation method (e.g., currently only 1D simulations are supported with reflective boundary conditions). 
 
-TOM WILL DO THIS: Speak about interoperability with Catalyst, MTK, DiffEQ
-
-## Interoperability with plotting packages
-
-TOM WILL DO THIS: Plots and Makie
 
 ## Data structures
 
 ## Functions
 
-### Exported functions
 ```@docs
+model_parameters
+save_turing
 screen_values
+get_params
+get_param
+returnTuringParams
+simulate
 ```
 
-Add lots more docstrings to the scripts in `src/`. 
 
-### Functions that are not exported but can be loaded
 

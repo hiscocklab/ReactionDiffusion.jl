@@ -1,42 +1,119 @@
-**NOTE: there are issues with speed!!** Currently, the package version of the scripts runs much slower than the `include("scripts.jl")` version of the script, particularly for large parameter sweeps (it grows exponentially bad the larger the parameter space screened). We need to fix this or change strategy!! If we move the symbolics stuff outside of the functions and run it locally the speed is much better. **We should still release `ReactionDiffusion.jl` as it is, but make sure to flag Daniel's github account and show the optimized version of running it (and how to download and implement it) and that we are working on optimizing the speed of this package.**
+# ReactionDiffusion.jl for modelling pattern formation in biological systems
 
-**NOTE: change the logo.png and favicon.ico images.** Currently these are from Catalyst.jl. Design a new logo - idea: 3 julia colors as nodes of a reaction-diffusion network?
+Reaction-diffusion dynamics are present across many areas of the physical and natural world, and allow complex spatiotemporal patterns to self-organize *de novo*. `ReactionDiffusion.jl` aims to be an easy-to-use and performant pipeline to simulate reaction-diffusion PDEs of arbitrary complexity, with a focus on pattern formation in biological systems. Using this package, complex, biologically-inspired reaction-diffusion models can be:
 
-**NOTE: one BIG think we need to do before starting the documentation**
-
-We need to work out how to handle plotting.
-
-I do not want to force users to load any plotting packages (e.g., Plots.jl, Makie.jl). These can be buggy and are liable to change frequently.
-
-Instead, can we write helper functions that make plotting **as simple as possible**. Currently I have some functions in `plotting_scripts.jl`. But these require `Plots.jl` to be loaded. Can you think of a nice, intuitive helper function that would allow us to plot things easily?
-
-# ReactionDiffusion.jl for modelling biological systems
-
-- insert a short, punchy description of the package
-    - easy to use
-    - very fast
-    - intuitive and biological
-- provide a trimmed down illustration of the package functionality, using a biologically-inspired case study as an example.
-    - how about a gdf5_mRNA, GDF5, nog_mRNA, NOG, pSMAD model, motivated from Grall et al. 2024?
-    - we should get across:
-        - intuitive @reaction_network model specification
-        - single line of code screens millions of parameters
-        - single line of code simulates the PDE
-        - show images and a movie!
-    - in this introductory section, we do not provide complete code - just snippets to emphasize how straightforward it is to use. 
-
-
+- specified using an intuitive syntax
+- screened across millions of parameter combinations to identify pattern-forming networks (i.e., those that undergo a Turing instability)
+- rapidly simulated to predict spatiotemporal patterns
 
 ## Quick start guide
 
-Here we should provide as simple as possible example of using the scripts. This should be the same example as above, but now complete end-to-end code. Most users may just look at the quick start guide - it should be enough to reproduce a simulation, but not too much that it sounds too complicated!
+Here we show how `ReactionDiffusion.jl` can be used to simulate a biologically-inspired reaction-diffusion system, responsible for generating evenly spaced joints along the length of your fingers and toes (from [Grall et el, 2024](https://www.pnas.org/doi/10.1073/pnas.2304470121)).
 
-## Citation and future developments
+We begin by specifying the reaction-diffusion dynamics via the intuitive syntax developed in [Catalyst.jl](https://github.com/SciML/Catalyst.jl), which naturally mirrors biochemical feedbacks and interactions.
 
-- provide citation to our preprint
-    - also to Catalyst.jl and DiffEq.jl
-- say that more functionality is planned in the future, but we are currently a small team of developers
+```@example quickstart
+using ReactionDiffusion
+
+model = @reaction_network begin
+    # complex formation
+    (k₊, k₋),               GDF5 + NOG <--> COMPLEX 
+    # degradation
+    δ₁,                     GDF5 --> ∅
+    δ₂,                     NOG --> ∅
+    δ₃,                     pSMAD --> ∅
+    # transcriptional feedbacks (here: repressive hill functions)
+    hillr(pSMAD,μ₁,K₁,n₁),  ∅ --> GDF5
+    hillr(pSMAD,μ₂,K₂,n₂),  ∅ --> NOG
+    # signalling
+    μ₃*GDF5,                ∅ --> pSMAD
+end  
+```
+
+We can then specify values for each parameter:
+
+```@example quickstart
+params = model_parameters()
+
+# constant parameters
+params.reaction["δ₃"] = [1.0]
+params.reaction["μ₁"] = [1.0]
+params.reaction["μ₃"] = [1.0]
+params.reaction["n₁"] = [8]
+params.reaction["n₂"] = [2]
+
+# varying parameters
+num_params = 5
+params.reaction["δ₁"] = screen_values(min = 0.1,max = 10, number=num_params)
+params.reaction["δ₂"] = screen_values(min = 0.1,max = 10,number=num_params)
+params.reaction["μ₂"] = screen_values(min = 0.1,max = 10, number=num_params)
+params.reaction["k₊"] = screen_values(min = 10.0,max = 100.0, number=num_params)
+params.reaction["k₋"] = screen_values(min = 10.0,max = 100.0, number=num_params)
+params.reaction["K₁"] = screen_values(min = 0.01,max = 1,number=num_params)
+params.reaction["K₂"] = screen_values(min = 0.01,max = 1, number=num_params)
+params.reaction
+
+```
+
+We must then also specify the diffusion coefficients for each variable:
+
+```@example quickstart
+params.diffusion = Dict(
+    "NOG"       => [1.0],
+    "GDF5"      => screen_values(min = 0.1,max = 30, number=10),
+    "COMPLEX"   => screen_values(min = 0.1,max = 30, number=10)
+)
+params.diffusion
+```
+
+Then, with a single line of code, we can perform a Turing instability analysis across all combinations of parameters:
+
+```@repl quickstart
+turing_params = returnTuringParams(model, params);
+```
+
+**NEED TO UPDATE VERSION, TOTAL NUMBER OF PARAMETERS IS INCORRECT**
+
+This returns all parameter combinations that can break symmetry from a homogeneous initial condition. We take advantage of the highly performant numerical solvers in [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl) to be able to simulate millions of parameter sets per minute on a standard laptop. 
+
+We may then take a single parameter set and simulate its spatiotemporal dynamics directly, using `Plots.jl` to visualize the resulting pattern:
+
+```@example quickstart
+param1 = get_params(model, turing_params[1000])
+sol = simulate(model,param1)
+
+using Plots
+plot(endpoint(),model,sol)
+```
+
+We may also view the full spatiotemporal dynamics:
+
+```@example quickstart
+@gif for t in 0.0:0.01:1
+    plot(timepoint(),model,sol,t)
+end fps=20
+```
 
 
+## Support, citation and future developments
 
+If you find `ReactionDiffusion.jl` helpful in your research, teaching, or other activities, please star the repository and consider citing this paper:
+
+```
+@article{TBD,
+ doi = {TBD},
+ author = {Muzatko, Daniel AND Daga, Bijoy AND Hiscock, Tom W.},
+ journal = {biorXiv},
+ publisher = {TBD},
+ title = {TBD},
+ year = {TBD},
+ month = {TBD},
+ volume = {TBD},
+ url = {TBD},
+ pages = {TBD},
+ number = {TBD},
+}
+```
+
+We are a small team of academic researchers who build mathematical models of developing embryos and tissues. We hope to extend the functionality of `ReactionDiffusion.jl` as funding and time allows. We also welcome suggestions and contributions from the community. 
 
