@@ -6,7 +6,6 @@ This is achieved by drawing from a range of numerical routines from the SciML pa
 
 
 ## Data structures
-
 We introduce two structures
 
 - `save_turing` is an object that records parameter sets that undergo a Turing instability. It has the following fields:
