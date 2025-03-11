@@ -113,5 +113,11 @@ If you find `ReactionDiffusion.jl` helpful in your research, teaching, or other 
 }
 ```
 
-We are a small team of academic researchers who build mathematical models of developing embryos and tissues. We hope to extend the functionality of `ReactionDiffusion.jl` as funding and time allows. We also welcome suggestions and contributions from the community. 
+We are a small team of academic researchers from the [Hiscock Lab](https://twhiscock.github.io/), who build mathematical models of developing embryos and tissues. We have found these scripts helpful in our own research, and make them available in case you find them helpful in your research too. We hope to extend the functionality of `ReactionDiffusion.jl` as our future projects, funding and time allows.
+
+This work is supported by ERC grant SELFORG-101161207, and UK Research and Innovation (Biotechnology and Biological Sciences Research Council, grant number BB/W003619/1) 
+
+*Funded by the European Union. Views and opinions expressed are however those of the author(s) only and do not necessarily reflect those of the European Union or the European Research Council Executive Agency. Neither the European Union nor the granting authority can be held responsible for them*
+
+![ERC_logo](./assets/LOGO_ERC-FLAG_FP.png)
 

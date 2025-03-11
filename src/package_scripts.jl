@@ -173,9 +173,9 @@ function get_params(model, turing_param)
     else
         param = model_parameters()
         param.reaction = Dict(zip(string.(parameters(model)), turing_param.reaction_params))
-        param.diffusion = Dict(zip(chop.(string.(states(model)),head=0,tail=3), turing_param.diffusion_constants))
+        param.diffusion = Dict(zip(chop.(string.(unknowns(model)),head=0,tail=3), turing_param.diffusion_constants))
         param.domain_size = 3*turing_param.wavelength # default value
-        param.initial_condition = Dict(zip(chop.(string.(states(model)),head=0,tail=3), turing_param.steady_state_values))
+        param.initial_condition = Dict(zip(chop.(string.(unknowns(model)),head=0,tail=3), turing_param.steady_state_values))
         param.initial_noise = 0.01
         param.random_seed = 0
         return param
@@ -191,7 +191,7 @@ function returnParameterSets(model, params)
 
     ds = Array{Array{Float64,1},1}(undef,0)
     ics = Array{Array{Float64,1},1}(undef,0)
-    for state in states(model)
+    for state in unknowns(model)
         push!(ds,get!(params.diffusion,chop(string(state), head=0,tail=3),[0])) ## default is zero
         push!(ics,get!(params.initial_condition,chop(string(state), head=0,tail=3),[1])) ## default is one
     end
@@ -210,7 +210,7 @@ function returnSingleParameter(model, params)
 
     ds = Array{Float64,1}(undef,0)
     ics = Array{Float64,1}(undef,0)
-    for state in states(model)
+    for state in unknowns(model)
         push!(ds,get!(params.diffusion,chop(string(state), head=0,tail=3),0)) ## default is zero
         push!(ics,get!(params.initial_condition,chop(string(state), head=0,tail=3),1)) ## default is one
     end
@@ -249,7 +249,7 @@ function get_param(model, turing_params, name, type)
         end
     elseif type == "diffusion"
         labels = []
-        for state in states(model)
+        for state in unknowns(model)
             push!(labels,chop(string(state), head=0,tail=3))
         end
         index = findall(labels .== name)
@@ -288,7 +288,7 @@ function returnTuringParams(model, params; maxiters = 1e3,alg=Rodas5(),abstol=1e
     # read in parameters (ps), diffusion constants (ds), and initial conditions (ics)
     ps,ds,ics, _, _, _ = returnParameterSets(model, params)
     n_params = length(parameters(model))
-    n_species = length(states(model))
+    n_species = length(unknowns(model))
 
     # convert reaction network to ODESystem
     odesys = convert(ODESystem, model)
@@ -394,7 +394,7 @@ Inputs carried over from DifferentialEquations.jl; see [here](https://docs.sciml
 function simulate(model,param;alg=KenCarp4(),reltol=1e-6,abstol=1e-8, dt = 0.1, maxiters = 1e3, save_everystep = true)
 
     n_params = length(parameters(model))
-    n_species = length(states(model))
+    n_species = length(unknowns(model))
 
     p,d,ic, l, seed, noise = returnSingleParameter(model, param)
 
@@ -455,7 +455,7 @@ struct endpoint end
     pattern = last(sol)
     x = range(0,1, length = size(pattern,1))
     labels = []
-    for state in model.states
+    for state in unknowns(model)
         push!(labels,chop(string(state), head=0,tail=3))
     end
 
@@ -486,7 +486,7 @@ struct timepoint end
 
     x = range(0,1, length = size(last(sol),1))    
     labels = []
-    for state in model.states
+    for state in unknowns(model)
         push!(labels,chop(string(state), head=0,tail=3))
     end
     labels = reshape(labels,1,length(labels))

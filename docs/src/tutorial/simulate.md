@@ -1,6 +1,6 @@
 # Simulate pattern formation in 1D
 
-Having now screened through parameter sets, we can now pick a single one and simulate the corresponding PDE. 
+Having now screened through parameter sets, we can now pick a single one and simulate the corresponding PDE. The simulation is performed on a 1D domain with reflective boundary conditions.  
 
 We first select the parameter values from `turing_params`; here we choose the 1000th parameter set found. 
 

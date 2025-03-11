@@ -5,7 +5,7 @@ using Documenter, ReactionDiffusion
 pages = Any["Home" => "index.md",
             "Tutorial" => Any["tutorial/installation.md",
             "tutorial/model.md","tutorial/params.md","tutorial/screen.md","tutorial/simulate.md","tutorial/save.md",],
-            "Examples" => Any["examples/cima.md","examples/gm.md","examples/schnakenburg.md"],
+            # "Examples" => Any["examples/cima.md","examples/gm.md","examples/schnakenburg.md"],
             "API" => "API/api.md"
             ]
 
@@ -20,6 +20,9 @@ makedocs(sitename="ReactionDiffusion.jl",
     modules=[ReactionDiffusion],
 
 )
+
+deploydocs(repo = "github.com/hiscocklab/ReactionDiffusion.jl.git";
+    push_preview = true)
 
 
 #run in Julia repl using: include("make.jl"), in the docs environment
