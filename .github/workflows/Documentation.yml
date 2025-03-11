@@ -46,7 +46,7 @@ jobs:
         env:
           GKSwstype: "100"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DOCUMENTER_KEY: ${{ secrets.COMPATHELPER_PRIV }}
+          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
         run: xvfb-run julia --project=docs --color=yes  docs/make.jl
 
       - name: Upload site as artifact
