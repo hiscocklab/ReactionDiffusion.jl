@@ -1,7 +1,5 @@
 # ReactionDiffusion.jl for modelling pattern formation in biological systems
 
-Hi!
-
 Reaction-diffusion dynamics are present across many areas of the physical and natural world, and allow complex spatiotemporal patterns to self-organize *de novo*. `ReactionDiffusion.jl` aims to be an easy-to-use and performant pipeline to simulate reaction-diffusion PDEs of arbitrary complexity, with a focus on pattern formation in biological systems. Using this package, complex, biologically-inspired reaction-diffusion models can be:
 
 - specified using an intuitive syntax
@@ -31,6 +29,17 @@ model = @reaction_network begin
     μ₃*GDF5,                ∅ --> pSMAD
 end  
 ```
+Which encodes for the following set of reaction-diffusion equations:
+
+$\begin{align}
+&\frac{\partial [GDF5]}{\partial t}=H_{1}[pSMAD]+k_-[COMPLEX]-k_+[GDF5][NOG]-\delta_1[GDF5]+D_{GDF5} \nabla^2[GDF5]  \nonumber \\
+&\frac{\partial [NOG]}{\partial t}= H_{2}[pSMAD]+k_-[COMPLEX]-k_+[GDF5][Nog]-\delta_2[NOG]+D_{NOG} \nabla^2[NOG]\nonumber \\
+&\frac{\partial [pSMAD]}{\partial t}= \mu_3[GDF5]-\delta_3[pSMAD] \nonumber \\
+&\frac{\partial [COMPLEX]}{\partial t}= k_+[GDF5][NOG]-k_-[COMPLEX]+D_{COMPLEX} \nabla^2[COMPLEX] \nonumber
+\end{align}$ 
+
+Where $H_1$ and $H_2$ represent the `hillr` functions for $GDF5$ and $Nog$ respectively.
+
 
 We can then specify values for each parameter:
 
