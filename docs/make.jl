@@ -5,7 +5,7 @@ using Documenter, ReactionDiffusion
 pages = Any["Home" => "index.md",
             "Tutorial" => Any["tutorial/installation.md",
             "tutorial/model.md","tutorial/params.md","tutorial/screen.md","tutorial/simulate.md","tutorial/save.md",],
-            # "Examples" => Any["examples/cima.md","examples/gm.md","examples/schnakenburg.md"],
+            "Examples" => Any["examples/schnakenberg.md", "examples/nodal.md"],
             "API" => "API/api.md"
             ]
 
