@@ -1,6 +1,6 @@
 # ReactionDiffusion.jl for modelling pattern formation in biological systems
 
-Hi
+Hi!
 
 Reaction-diffusion dynamics are present across many areas of the physical and natural world, and allow complex spatiotemporal patterns to self-organize *de novo*. `ReactionDiffusion.jl` aims to be an easy-to-use and performant pipeline to simulate reaction-diffusion PDEs of arbitrary complexity, with a focus on pattern formation in biological systems. Using this package, complex, biologically-inspired reaction-diffusion models can be:
 
