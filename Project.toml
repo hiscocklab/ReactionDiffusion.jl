@@ -1,7 +1,7 @@
 name = "ReactionDiffusion"
 uuid = "dcda7c7e-49c0-481c-982d-c35bedad83cd"
 authors = ["Tom W. Hiscock"]
-version = "0.1.10"
+version = "0.1.11"
 
 
 [deps]
