@@ -19,8 +19,19 @@ model = @reaction_network begin
     μ₃*GDF5,                ∅ --> pSMAD
 end  
 ```
+Mathematically this encodes for the reaction terms within the system:
 
-Here, reaction rates are assumed to follow mass action kinetics according to the stoichiometries of the reactants. So, for example, the `(k₊, k₋), GDF5 + NOG <--> COMPLEX` term represents the binding/unbinding of `GDF5` and `NOG` to form a `COMPLEX`. The rate of the forward reaction (i.e., the rate of complex formation) is $k_+ [\mathrm{GDF5}] [\mathrm{NOG}]$, and the rate of the reverse reaction (i.e., the rate of complex dissociation) is $k_- [\mathrm{COMPLEX}]$.
+$\begin{align}
+&\frac{\partial [GDF5]}{\partial t}=H_{1}[pSMAD]+k_-[COMPLEX]-k_+[GDF5][NOG]-\delta_1[GDF5]+D_{GDF5} \nabla^2[GDF5] \nonumber \\
+&\frac{\partial [NOG]}{\partial t}= H_{2}[pSMAD]+k_-[COMPLEX]-k_+[GDF5][NOG]-\delta_2[NOG]+D_{NOG} \nabla^2[NOG]\nonumber \\
+&\frac{\partial [pSMAD]}{\partial t}= \mu_3[GDF5]-\delta_3[pSMAD] \nonumber \\
+&\frac{\partial [COMPLEX]}{\partial t}= k_+[GDF5][NOG]-k_-[COMPLEX]+D_{COMPLEX} \nabla^2[COMPLEX] \nonumber
+\end{align}$ 
+
+Here, reaction rates are assumed to follow mass action kinetics according to the stoichiometries of the reactants. So, for example, the `(k₊, k₋), GDF5 + NOG <--> COMPLEX` term represents the binding/unbinding of `GDF5` and `NOG` to form a `COMPLEX`. The rate of the forward reaction (i.e., the rate of complex formation) is $k_+ [\mathrm{GDF5}] [\mathrm{NOG}]$, and the rate of the reverse reaction (i.e., the rate of complex dissociation) is $k_- [\mathrm{COMPLEX}]$:
+
+$GDF5 + NOG \xrightleftharpoons[k_-]{k_+} COMPLEX$
+
 
 Reaction rates can also be overriden by user-specified functions, for example to denote regulatory feedbacks. In this example, the effect of `pSMAD` on `GDF5` expression is captured by the repressive hill function `hillr`: $\frac{\mu_1}{ 1 + ([\mathrm{pSMAD}]/K_1)^{n_1}}$. 
 
