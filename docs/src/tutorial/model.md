@@ -30,7 +30,7 @@ $$\begin{align}
 
 Here, reaction rates are assumed to follow mass action kinetics according to the stoichiometries of the reactants. So, for example, the `(k₊, k₋), GDF5 + NOG <--> COMPLEX` term represents the binding/unbinding of `GDF5` and `NOG` to form a `COMPLEX`. The rate of the forward reaction (i.e., the rate of complex formation) is $k_+ [\mathrm{GDF5}] [\mathrm{NOG}]$, and the rate of the reverse reaction (i.e., the rate of complex dissociation) is $k_- [\mathrm{COMPLEX}]$:
 
-$GDF5 + NOG \xrightleftharpoons[k_-]{k_+} COMPLEX$
+$$GDF5 + NOG \xrightleftharpoons[k_-]{k_+} COMPLEX$$
 
 
 Reaction rates can also be overriden by user-specified functions, for example to denote regulatory feedbacks. In this example, the effect of `pSMAD` on `GDF5` expression is captured by the repressive hill function `hillr`: $\frac{\mu_1}{ 1 + ([\mathrm{pSMAD}]/K_1)^{n_1}}$. 
