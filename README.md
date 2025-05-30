@@ -129,25 +129,7 @@ end fps=20
 
 ## Support, citation and future developments
 
-If you find ReactionDiffusion.jl helpful in your research, teaching, or other activities, please star the repository and consider citing this paper:
-
-```
-@article{TBD,
- doi = {TBD},
- author = {Muzatko, Daniel AND Daga, Bijoy AND Hiscock, Tom W.},
- journal = {biorXiv},
- publisher = {TBD},
- title = {TBD},
- year = {TBD},
- month = {TBD},
- volume = {TBD},
- url = {TBD},
- pages = {TBD},
- number = {TBD},
-}
-```
-
-
+If you find ReactionDiffusion.jl helpful in your research, teaching, or other activities, please star the repository and consider citing [this paper](https://www.biorxiv.org/content/10.1101/2025.05.27.656324v1).
 
 We are a small team of academic researchers from the [Hiscock Lab](https://twhiscock.github.io/), who build mathematical models of developing embryos and tissues. We have found these scripts helpful in our own research, and make them available in case you find them helpful in your research too. We hope to extend the functionality of ReactionDiffusion.jl as our future projects, funding and time allows.
 
