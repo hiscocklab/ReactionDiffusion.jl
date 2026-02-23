@@ -54,6 +54,7 @@ function timeseries_plot(model, u, t; normalise=true, hide_y=true, autolimits=tr
 	end
 	axislegend(ax)
     display(fig)
+    fig
 end
 
 """
@@ -92,5 +93,6 @@ function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_
 	end
     axislegend(ax)
     display(fig)
+    fig
 end
 end
