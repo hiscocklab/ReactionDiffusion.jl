@@ -6,6 +6,8 @@ using ..PseudoSpectral
 using ..Util: issingle
 using SciMLBase: solve, successful_retcode, EnsembleProblem, EnsembleSolution, DiscreteCallback, terminate!, get_du
 using OrdinaryDiffEqExponentialRK: ETDRK4
+using OrdinaryDiffEqTsit5: Tsit5 # temp
+
 using ProgressMeter: Progress, BarGlyphs, next!
 
 using Symbolics:Num #temp
@@ -34,7 +36,17 @@ simulate(model, params; kwargs...) = simulate(model; kwargs...)(params)
 
 Partially applied version of `simulate` to avoid repeating expensive setup when simulating the same model reapeatedly.
 """
-function simulate(model; output_func=tuple, full_solution=false, alg=ETDRK4(), num_verts=64, dt=0.1, max_attempts = 4, tol=1e-5, noise=1e-4, kwargs...)
+function simulate(model; discretisation=:pseudospectral,kwargs...)
+    if discretisation==:pseudospectral
+        simulate_pseudospectral(model; kwargs...)
+    elseif discretisation==:mol
+        simulate_mol(model; kwargs...)
+    else
+        error("Unsupported discretisation: $(discretisation).")
+    end
+end
+
+function simulate_pseudospectral(model; output_func=tuple, full_solution=false, alg=ETDRK4(), num_verts=64, dt=0.1, max_attempts = 4, tol=1e-5, noise=1e-4, kwargs...)
     make_prob, transform = pseudospectral_problem(model, num_verts; noise=noise)
 
     f(params) = f([params]) |> only # Accept a single parameter set instead of a vector.
@@ -72,6 +84,30 @@ function simulate(model; output_func=tuple, full_solution=false, alg=ETDRK4(), n
         end
     end
 end
+
+
+function simulate_mol(model; output_func=tuple, full_solution=false, alg=Tsit5(), num_verts=64, dt=0.1, max_attempts = 4, tol=1e-5, noise=1e-4, kwargs...)
+    f(params) = f([params]) |> only # Accept a single parameter set instead of a vector.
+    f(params::AbstractVector) = f(parameter_set.(model, params))
+    function f(params::Vector{ParameterSet})
+        isempty(params) && return EnsembleSolution([], 0.0, false) # Handle an empty collection of parameter sets.
+
+        progress = Progress(length(params); desc="Simulating parameter sets: ", dt=0.1, barglyphs=BarGlyphs("[=> ]"), barlen=50, color=:yellow)
+        function _output_func(sol,i)
+            (sol.u,sol.t)
+        end
+            
+        prob_func(prob, i, attempt) = mol_problem(p, attempt, params[i])
+        prob1 = mol_problem(model, num_verts, params[1])
+
+        ensemble_prob = EnsembleProblem(prob1; output_func=_output_func, prob_func=prob_func)
+        
+        with_logger(ConsoleLogger(stderr, Error)) do
+            solve(ensemble_prob, alg; trajectories=length(params), callback=steady_state_callback(tol), verbose=false, kwargs...)
+        end
+    end
+end
+
 
 
 function steady_state_callback(tol=1e-4)
