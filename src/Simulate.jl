@@ -4,15 +4,18 @@ export simulate
 using ..Models
 using ..PseudoSpectral
 using ..Util: issingle
-using SciMLBase: solve, successful_retcode, EnsembleProblem, EnsembleSolution, DiscreteCallback, terminate!, get_du
+using SciMLBase: solve, successful_retcode, EnsembleProblem, EnsembleSolution, DiscreteCallback, terminate!, get_du, remake
 using OrdinaryDiffEqExponentialRK: ETDRK4
 using OrdinaryDiffEqTsit5: Tsit5 # temp
+using OrdinaryDiffEqSDIRK: KenCarp3
 
 using ProgressMeter: Progress, BarGlyphs, next!
 
 using Symbolics:Num #temp
 
 using Logging: with_logger, ConsoleLogger, stderr, Error
+using Pipe: @pipe
+using Random: seed!
 """
     simulate(model, params; output_func=nothing, full_solution=false, alg=ETDRK4(), num_verts=64, dt=0.1, max_attempts = 4, tol=1e-4, kwargs...)
 
@@ -36,7 +39,8 @@ simulate(model, params; kwargs...) = simulate(model; kwargs...)(params)
 
 Partially applied version of `simulate` to avoid repeating expensive setup when simulating the same model reapeatedly.
 """
-function simulate(model; discretisation=:pseudospectral,kwargs...)
+function simulate(model; discretisation=:pseudospectral, seed=nothing, kwargs...)
+    seed!(seed)
     if discretisation==:pseudospectral
         simulate_pseudospectral(model; kwargs...)
     elseif discretisation==:mol
@@ -86,7 +90,10 @@ function simulate_pseudospectral(model; output_func=tuple, full_solution=false, 
 end
 
 
-function simulate_mol(model; output_func=tuple, full_solution=false, alg=Tsit5(), num_verts=64, dt=0.1, max_attempts = 4, tol=1e-5, noise=1e-4, kwargs...)
+function simulate_mol(model; output_func=tuple, full_solution=false, alg=KenCarp3(), num_verts=64, tol=1e-5, noise=1e-4, kwargs...)
+    prob = mol_problem(model, num_verts)
+    prob = remake(prob; u0=prob.u0+noise*abs.(randn(length(prob.u0))))
+    sps = species(model)
     f(params) = f([params]) |> only # Accept a single parameter set instead of a vector.
     f(params::AbstractVector) = f(parameter_set.(model, params))
     function f(params::Vector{ParameterSet})
@@ -94,16 +101,26 @@ function simulate_mol(model; output_func=tuple, full_solution=false, alg=Tsit5()
 
         progress = Progress(length(params); desc="Simulating parameter sets: ", dt=0.1, barglyphs=BarGlyphs("[=> ]"), barlen=50, color=:yellow)
         function _output_func(sol,i)
-            (sol.u,sol.t)
+            u = @pipe sol.u |> values |> stack |> permutedims(_,[2,3,1])
+            t = sol.t
+            if !full_solution
+                u = u[:,:,end]
+                t = t[end]
+            end
+            if successful_retcode(sol)
+                out = output_func(u,t)
+                next!(progress) # Advance progress bar.
+            else
+                out = missing
+            end
+            (out, false)
         end
-            
-        prob_func(prob, i, attempt) = mol_problem(p, attempt, params[i])
-        prob1 = mol_problem(model, num_verts, params[1])
-
-        ensemble_prob = EnsembleProblem(prob1; output_func=_output_func, prob_func=prob_func)
+        
+        prob_func(prob, i, attempt) = remake(prob; p=params[i])
+        ensemble_prob = EnsembleProblem(prob; output_func=_output_func, prob_func=prob_func)
         
         with_logger(ConsoleLogger(stderr, Error)) do
-            solve(ensemble_prob, alg; trajectories=length(params), callback=steady_state_callback(tol), verbose=false, kwargs...)
+            solve(ensemble_prob, alg; trajectories=length(params), callback=steady_state_callback(tol), verbose=false, maxiters=1e6, kwargs...)
         end
     end
 end

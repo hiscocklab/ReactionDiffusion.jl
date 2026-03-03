@@ -7,23 +7,27 @@ export Model, species, parameters, reaction_parameters, boundary_parameters, dif
     parameter_set, ParameterSet,
     mol_problem
 
+## Extended methods
 import ..PseudoSpectral: pseudospectral_problem
 export pseudospectral_problem
 
 import ModelingToolkit: ODESystem
 export ODESystem
-
+##
 
 using Symbolics: Num, value, get_variables, @variables, getname, substitute
 import Catalyst # Catalyst.species and Catalyst.parameters would conflict with our functions.
 using Catalyst: numspecies, numparams, assemble_oderhs, @species, @parameters, @reaction_network, ExprValues, get_usexpr, get_psexpr, esc_dollars!, find_parameters_in_rate!, forbidden_symbol_check, DEFAULT_IV_SYM, default_t, setmetadata, ReactionSystem, independent_variable
+import ModelingToolkit # Needed for internal Catalyst functions.
 using ..Util: subst, ensure_function, zip_dict
 using Pipe
 
 
+## MOL
 using ModelingToolkit: Differential, PDESystem, @named
 using SciMLBase: discretize
-using MethodOfLines: MOLFiniteDifference
+using MethodOfLines: MOLFiniteDifference#
+##
 
 # TODO CHECK for unnecessary Num conversions! Alternatively add needed Num conversions (and remove from Turing.jl)
 """
@@ -108,32 +112,34 @@ function pseudospectral_problem(model, num_verts; kwargs...)
 end
 
 
-function mol_problem(model, num_verts, p; kwargs...)
+function mol_problem(model, num_verts; noise=1e-4, kwargs...)
     @parameters t x
     Dt = Differential(t)
+    Dx = Differential(x)
     Dxx = Differential(x)^2
     L = domain_size(model)
     S= species(model)
     R = reaction_rates(model)
-    D = diffusion_rates(model)
-    B = -boundary_flux(model) ./ diffusion_rates(model)'
+    D = diffusion_rates(model)/L^2
+    B = -L * boundary_flux(model) ./ diffusion_rates(model)'
     I = initial_conditions(model)
+    ps = parameters(model)
 
     names = model |> species .|> getname
-    S′ = [only(@variables $n(..))(t,x) for n in names]
-    R′ = [substitute(r, zip_dict(S,S′)) for r in R]
-    @show R′
+    S_f = [only(@variables $n(..)) for n in names]
+    S_tx = [u(t,x) for u in S_f]
+    R_tx = [substitute(r, zip_dict(S,S_tx)) for r in R]
 
-    eqs = [Dt(u) ~ R′ + D * Dxx(u) for u in S′]
-    ics = [u(x,0) ~ ic for (u,ic) in zip(S′,I)]
-    bcs0 = [u(0,t) ~ bc for (u,bc) in zip(S′,B[1,:])]
-    bcs1 = [u(L,t) ~ bc for (u,bc) in zip(S′,B[2,:])]
+    eqs = [Dt(u) ~ r + d * Dxx(u) for (u,r,d) in zip(S_tx, R_tx, D)]
+    ics = [u(0,x) ~ ic for (u,ic) in zip(S_f,I)]
+    bcs0 = [Dx(u(t,0)) ~ bc for (u,bc) in zip(S_f,B[1,:])]
+    bcs1 = [Dx(u(t,1)) ~ bc for (u,bc) in zip(S_f,B[2,:])]
     bcs = [ics; bcs0; bcs1]
    
-    domains = [t ∈ (0.0, Inf), x ∈ (0.0, L)]
-    @named pdesys = PDESystem(eqs, bcs, domains, [t, x], S′, p)
-    @show pdesys
-    discretize(pdesys, MOLFiniteDifference([x => num_verts], t))
+    domains = [t ∈ (0.0, 5e5), x ∈ (0.0, 1.0)]
+    p0 = zip_dict(ps, zeros(length(ps)))
+    @named pdesys = PDESystem(eqs, bcs, domains, [t, x], S_tx, ps; defaults=p0)
+    discretize(pdesys, MOLFiniteDifference([x => 1/(num_verts-1)], t))
 end
 
 
