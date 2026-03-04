@@ -6,7 +6,7 @@ using ..PseudoSpectral
 using ..Util: issingle
 using SciMLBase: solve, successful_retcode, EnsembleProblem, EnsembleSolution, DiscreteCallback, terminate!, get_du, remake
 using OrdinaryDiffEqExponentialRK: ETDRK4
-using OrdinaryDiffEqTsit5: Tsit5 # temp
+# using OrdinaryDiffEqTsit5: Tsit5 # temp
 using OrdinaryDiffEqSDIRK: KenCarp3
 
 using ProgressMeter: Progress, BarGlyphs, next!

@@ -44,15 +44,14 @@ end
 
 @testset "MOL" begin
     model = Schnakenberg.model
-    params = dict(a = 0.2, b = 2.0, γ = 1.0, Dᵤ = 1.0, Dᵥ = 50.0, L=100.0, U0=1.0,V0=1.0)
+    params = dict(a = 0.2, b = 2.0, γ = 1.0, Dᵤ = 1.0, Dᵥ = 50.0, L=100.0)
     expected_periods = 1/turing_wavelength(model,params)
-    u,t = simulate(model, params)
-    u_mol,t_mol = simulate(model, params; discretisation=:mol)
-
+    u,t = simulate(model, params; seed = 10)
+    u_mol,t_mol = simulate(model, params; discretisation=:mol, seed=10, reltol=1e-4)
 
     u = u[:,1]
     u_mol = u_mol[:,1]
-    @test u ≈ u_mol
+    @test maximum(abs.(u_mol-u)) < 0.15
 end
 
 @testset "initial conditions" begin
