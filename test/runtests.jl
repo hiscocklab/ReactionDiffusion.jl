@@ -12,7 +12,7 @@ end
 
 dynamic_range(u) = maximum(u)/minimum(u) 
 
-
+##
 @testset "turing_wavelength" begin
     model = Schnakenberg.model
     params = product(a = range(0.0,0.6,4), b = range(0.0,3.0,4), γ = [1.0], Dᵤ = [1.0], Dᵥ = [50.0], L = [100.0])

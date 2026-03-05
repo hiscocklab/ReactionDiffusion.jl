@@ -63,7 +63,6 @@ function simulate_pseudospectral(model; output_func=tuple, full_solution=false, 
         function _output_func(sol,i)
             attempt = sol.prob.p.attempt
             u,t = transform(sol; full_solution=full_solution)
-
             if successful_retcode(sol)
                 out = output_func(u,t)
                 repeat = false

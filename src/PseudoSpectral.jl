@@ -75,6 +75,7 @@ function pseudospectral_problem(species, reaction_rates, diffusion_rates, bounda
                 u = reshape(u,n,m)
                 plan! * u
                 BC && (u .+= sol.prob.p.ϕ)
+                u
             end
             if full_solution
                 u = stack(f.(sol.u))
@@ -88,8 +89,8 @@ function pseudospectral_problem(species, reaction_rates, diffusion_rates, bounda
 
         make_problem, transform
     end
-
-    dispatch_bcs(Val(iszero(boundary_conditions)))
+    
+    dispatch_bcs(Val(!iszero(boundary_conditions)))
 end
 
 "Build function for the reaction component, with `f(v+ϕ) + Δϕ` offset for non-zero-flux BCs."
