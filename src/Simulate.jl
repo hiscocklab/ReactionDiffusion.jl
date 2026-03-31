@@ -51,7 +51,7 @@ function simulate(model; output_func=tuple, full_solution=false, alg=ETDRK4(), n
             u,t = transform(sol; full_solution=full_solution)
 
             if successful_retcode(sol)
-                out = output_func(u,t)
+                out = output_func(u, t)
                 repeat = false
                 next!(progress) # Advance progress bar.
             else

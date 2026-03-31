@@ -2,14 +2,18 @@ module PseudoSpectral
 
 export pseudospectral_problem, x
 using ..Util: collect_variables, safe_stack
+using ..Models: Model, species, reaction_rates, diffusion_rates, boundary_conditions, initial_conditions
 using SciMLBase: SplitODEProblem, DiagonalOperator, ODEFunction, update_coefficients!, remake
 using FFTW: plan_r2r!, REDFT00, MEASURE
 using Symbolics: @variables, sparsejacobian, build_function, substitute
 
-const x = only(@variables(x))
+# const x = only(@variables(x))
 
-"Construct a SplitODEProblem to solve a reaction diffusion system with reflective boundaries.
-Returns the SplitODEProblem with solutions in the frequency (DCT-1) domain and a FFTW plan to transform solutions back to the spatial domain."
+"""
+Construct a SplitODEProblem to solve a reaction diffusion system with reflective boundaries.
+
+Returns the SplitODEProblem with solutions in the frequency (DCT-1) domain and a FFTW plan to transform solutions back to the spatial domain.
+"""
 function pseudospectral_problem(species, reaction_rates, diffusion_rates, boundary_conditions, initial_conditions, num_verts; noise=1e-4, kwargs...)
     n = num_verts
     m = length(species)
@@ -76,6 +80,17 @@ function pseudospectral_problem(species, reaction_rates, diffusion_rates, bounda
     end
 
     make_problem, transform
+end
+
+"""
+Construct a SplitODEProblem to solve a reaction diffusion system with reflective boundaries.
+
+Returns the SplitODEProblem with solutions in the frequency (DCT-1) domain and a FFTW plan to transform solutions back to the spatial domain.
+"""
+function pseudospectral_problem(model::Model, num_verts; kwargs...)
+
+    pseudospectral_problem(species(model), reaction_rates(model), diffusion_rates(model), boundary_conditions(model), initial_conditions(model), num_verts; kwargs...)
+
 end
 
 "Build function for the reaction component, with `f(v+ϕ) + Δϕ` offset for non-zero-flux BCs."

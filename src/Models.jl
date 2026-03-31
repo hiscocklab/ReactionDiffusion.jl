@@ -62,7 +62,7 @@ diffusion_rates(model::Model, default=0.0) = [get(model.diffusion.rates, s, defa
 initial_conditions(model::Model, default=0.0) = [get(model.initial_conditions, s, default) for s in species(model)]
 
 function boundary_conditions(model::Model)
-    b0,b1 = model.boundary_conditions
+    b0, b1 = model.boundary_conditions
     s = species(model)
     vcat(assemble_oderhs(b0, s)', assemble_oderhs(b1, s)')
 end
