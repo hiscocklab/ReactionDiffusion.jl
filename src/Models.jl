@@ -40,10 +40,9 @@ end
 
 SpeciesValues = Dict{Num,Num}
 
-
-Model(reaction, diffusion) = Model(reaction,diffusion, (@reaction_network, @reaction_network), SpeciesValues())
-Model(reaction, diffusion, initial::SpeciesValues) = Model(reaction,diffusion, (@reaction_network, @reaction_network), initial)
-Model(reaction, diffusion, boundary::Tuple{ReactionSystem,ReactionSystem}) = Model(reaction,diffusion, boundary, SpeciesValues())
+Model(reaction, diffusion) = Model(reaction, diffusion, (@reaction_network, @reaction_network), SpeciesValues())
+Model(reaction, diffusion, initial::SpeciesValues) = Model(reaction, diffusion, (@reaction_network, @reaction_network), initial)
+Model(reaction, diffusion, boundary::Tuple{ReactionSystem, ReactionSystem}) = Model(reaction, diffusion, boundary, SpeciesValues())
 
 # Don't try to broadcast over a model.
 Base.broadcastable(model::Model) = Ref(model)
@@ -86,15 +85,15 @@ reaction_parameters(model::Model, params, default=0.0) = subst(reaction_paramete
 
 function diffusion_rates(model::Model, params::Dict{Symbol, Float64}, default=0.0) # wrong and bad
     syms = Dict(nameof(p) => p for p in parameters(model))
-    params = Dict(syms[k] => v for (k,v) in params)
-    [(substitute(D, params)) for D in diffusion_rates(model,default)]
+    params = Dict(syms[k] => v for (k, v) in params)
+    [(substitute(D, params)) for D in diffusion_rates(model, default)]
 end
 
 function pseudospectral_problem(model, num_verts; kwargs...)
     L = domain_size(model)
     S = species(model)
     R = reaction_rates(model)
-    D = diffusion_rates(model)/L^2
+    D = diffusion_rates(model) / L^2
     B = -L * boundary_conditions(model) ./ diffusion_rates(model)'
     I = initial_conditions(model)
     pseudospectral_problem(S, R, D, B, I, num_verts; kwargs...)
@@ -125,15 +124,15 @@ end
 ```
 """
 macro diffusion_system(L, body)
-    diffusion_system(L,body,__source__)
+    diffusion_system(L, body, __source__)
 end
 
 macro diffusion_system(body)
-    diffusion_system(1,body,__source__)
+    diffusion_system(1, body, __source__)
 end
 
 function diffusion_system(L, body, source)
-    species,parameters,pairs = parse_body(body, source)
+    species, parameters, pairs = parse_body(body, source)
     rexpr = dict_expr(pairs)
     L = parse_expr!(parameters, L)
     forbidden_symbol_check(parameters)
@@ -150,7 +149,7 @@ function diffusion_system(L, body, source)
 end
 
 parameters(ds::DiffusionSystem) = union(get_variables(ds.domain_size), parameters(ds.rates))
-parameters(v::SpeciesValues) = @pipe v |> values .|> get_variables |> union(_...,[]) |> Num.(_)
+parameters(v::SpeciesValues) = @pipe v |> values .|> get_variables |> union(_..., []) |> Num.(_)
 
 
 """
@@ -167,7 +166,7 @@ end
 ```
 """
 macro initial_conditions(body)
-    species,parameters,pairs = parse_body(body, __source__)
+    species, parameters, pairs = parse_body(body, __source__)
     icexpr = dict_expr(pairs)
     psexpr = get_psexpr(parameters, Dict{Symbol, Expr}()) # @parameters
     iv = :($(DEFAULT_IV_SYM) = default_t()) # t
@@ -184,14 +183,14 @@ function parse_body(body, source)
     Base.remove_linenums!(body)
     parameters = ExprValues[]
     species = ExprValues[]
-    pairs = Pair{ExprValues,ExprValues}[]
+    pairs = Pair{ExprValues, ExprValues}[]
 
     for b in body.args
-        r,s = b.args
+        r, s = b.args
         # Handle interpolation of variables
         r = parse_expr!(parameters,r)
         s = esc_dollars!(s)
-        push!(pairs, s=>r)
+        push!(pairs, s => r)
         push!(species, s)
     end
 
@@ -206,7 +205,7 @@ function parse_expr!(parameters, x)
     x
 end
 
-dict_expr(pairs) = :(SpeciesValues($([:($k => $v) for (k,v) in pairs]...)))
+dict_expr(pairs) = :(SpeciesValues($([:($k => $v) for (k, v) in pairs]...)))
 
 ParameterSet = Dict{Num, Float64}
 
