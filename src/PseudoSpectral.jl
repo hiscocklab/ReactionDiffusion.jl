@@ -15,33 +15,29 @@ function pseudospectral_problem(species, reaction_rates, diffusion_rates, bounda
     m = length(species)
     
     # Collect parameter symbols. 
-    rs,ds,bs,is = (setdiff(collect_variables(exprs), x, species) for exprs in (reaction_rates, diffusion_rates, vec(boundary_conditions), initial_conditions))
+    rs, ds, bs, is = (setdiff(collect_variables(exprs), x, species) for exprs in (reaction_rates, diffusion_rates, vec(boundary_conditions), initial_conditions))
 
     u = Matrix{Float64}(undef, n, m)
-    plan! = 1/sqrt(2*(n-1)) * plan_r2r!(u, REDFT00, 1; flags=MEASURE)
-
-
+    planned = 1 / sqrt(2 * (n - 1)) * plan_r2r!(u, REDFT00, 1; flags=MEASURE)
 
     ## Offsets for constant, non-zero flux boundary conditions.
     # For u′(0) = a, u′(1) = b,
     # define ϕ as a smooth function such that ϕ′(0) = a, ϕ′(1) = b, and write v = u - ϕ.
     # Then v′(0) = 0, v′(1) = 0, so we can solve for v using DCT-I.
-    a,b = eachrow(boundary_conditions)
-    X = range(0.0,1.0,n)
-    ϕ = X.^2 * (b'-a')/2 + X * a'
-    Δϕ = ((b-a).*diffusion_rates)' |> collect
-    fϕ,_ = build_function(ϕ, bs; expression=Val{false})
-    fΔϕ,_ = build_function(Δϕ, ds,bs; expression=Val{false})
-
+    a, b = eachrow(boundary_conditions)
+    X = range(0.0, 1.0, n)
+    ϕ = X.^2 * (b' - a') / 2 + X * a'
+    Δϕ = ((b - a) .* diffusion_rates)' |> collect
+    fϕ,_ = build_function(ϕ, bs; expression = Val{false})
+    fΔϕ,_ = build_function(Δϕ, ds, bs; expression = Val{false})
     
     R = reaction_operator(species, reaction_rates, rs, plan!)
     D = diffusion_operator(diffusion_rates, ds, n)
     prob = SplitODEProblem(D, R, vec(u), Inf, nothing; kwargs...)
 
-    u0 = [substitute(ic, x=>X) for X in range(0,1,n), ic in initial_conditions]
+    u0 = [substitute(ic, x => X) for X in range(0, 1, n), ic in initial_conditions]
     _fu0,_= build_function(u0, is; expression=Val{false})
-    fu0(i) = _fu0(i) + noise*abs.(randn(n,m))
-
+    fu0(i) = _fu0(i) + noise * abs.(randn(n, m))
 
     # Function to set parameter values.
     function make_problem(params, attempt=1; kwargs...)
@@ -50,14 +46,14 @@ function pseudospectral_problem(species, reaction_rates, diffusion_rates, bounda
         b = Float64[params[k] for k in bs]
         i = Float64[params[k] for k in is]
         local ϕ = fϕ(b)
-        local Δϕ = fΔϕ(d,b)
+        local Δϕ = fΔϕ(d, b)
         local u0 = fu0(i) - ϕ
-        plan! * u0
+        planned * u0
         u0 = vec(u0)
-        w = Matrix{Float64}(undef,n,m) # Allocate working memory for FFTW.
-        p = Parameters(w,r,d,ϕ,Δϕ,attempt)
+        w = Matrix{Float64}(undef, n, m) # Allocate working memory for FFTW.
+        p = Parameters(w, r, d, ϕ, Δϕ, attempt)
         update_coefficients!(prob.f.f1.f, u0, p, 0.0) # Set parameter values in diffusion operator.
-        remake(prob; p=p, u0=u0, kwargs...) # Set parameter values in SplitODEProblem.
+        remake(prob; p = p, u0 = u0, kwargs...) # Set parameter values in SplitODEProblem.
     end     
 
 

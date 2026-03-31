@@ -11,6 +11,7 @@ using ProgressMeter: Progress, BarGlyphs, next!
 using Symbolics:Num #temp
 
 using Logging: with_logger, ConsoleLogger, stderr, Error
+
 """
     simulate(model, params; output_func=nothing, full_solution=false, alg=ETDRK4(), num_verts=64, dt=0.1, max_attempts = 4, tol=1e-4, kwargs...)
 
@@ -19,9 +20,9 @@ Simulate `model` for the parameters and initial conditions given in `params`, st
 
 
 # Arguments
-- `model`: `Model` object containg the system to be simulated.
+- `model`: `Model` object containing the system to be simulated.
 - `params`: Either a single parameter set or a vector of parameter sets to be solved as an ensemble. Parameter sets can be created manually with parameter_set or supplied as a dict or collection of pairs in which case defaults will be used for any missed values and low-level noise added to initial conditions. Parameters values may be either single numbers which are replicated homogenously over the domain, or functions mapping the interval [0.0,1.0] to values for the corresponding point in space. 
-- `output_func(u,t)`: Function to transform output values. 
+- `output_func(u, t)`: Function to transform output values. 
 - `full_solution`: Return a vector of values at each time point if true, instead of just the steady-state solution.
 - `max_attempts`: Number of times to retry with reduced dt before giving up if the solution fails to converge. 
 - `num_verts`: Number of points in spatial discretisation.
@@ -30,11 +31,12 @@ For other keyword arguments see https://docs.sciml.ai/DiffEqDocs/stable/basics/c
 simulate(model, params; kwargs...) = simulate(model; kwargs...)(params)
 
 """
-    function simulate(model; output_func=nothing, full_solution=false, alg=ETDRK4(), num_verts=64, dt=0.1, max_attempts = 4, tol=1e-4, kwargs...)
+    function simulate(model; output_func=nothing, full_solution=false, alg=ETDRK4(), num_verts=64, dt=0.1, max_attempts = 4, tol=1e-5, noise=1e-4, kwargs...)
 
 Partially applied version of `simulate` to avoid repeating expensive setup when simulating the same model reapeatedly.
 """
 function simulate(model; output_func=tuple, full_solution=false, alg=ETDRK4(), num_verts=64, dt=0.1, max_attempts = 4, tol=1e-5, noise=1e-4, kwargs...)
+
     make_prob, transform = pseudospectral_problem(model, num_verts; noise=noise)
 
     f(params) = f([params]) |> only # Accept a single parameter set instead of a vector.
