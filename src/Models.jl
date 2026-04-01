@@ -11,7 +11,7 @@ import Catalyst # Catalyst.species and Catalyst.parameters would conflict with o
 
 using Symbolics: Num, value, get_variables
 using Catalyst: numspecies, numparams, assemble_oderhs, @species, @parameters, @reaction_network, ExprValues, get_usexpr, get_psexpr, esc_dollars!, find_parameters_in_rate!, forbidden_symbol_check, DEFAULT_IV_SYM, default_t, setmetadata, ReactionSystem
-using ..Util: subst, ensure_function
+using ..Util: subst, ensure_function, parse_body, parse_expr!, dict_expr
 using Pipe
 using ..PseudoSpectral: pseudospectral_problem
 
@@ -182,34 +182,6 @@ macro initial_conditions(body)
         $icexpr
     end
 end
-
-function parse_body(body, source)
-    Base.remove_linenums!(body)
-    parameters = ExprValues[]
-    species = ExprValues[]
-    pairs = Pair{ExprValues, ExprValues}[]
-
-    for b in body.args
-        r, s = b.args
-        # Handle interpolation of variables
-        r = parse_expr!(parameters,r)
-        s = esc_dollars!(s)
-        push!(pairs, s => r)
-        push!(species, s)
-    end
-
-    forbidden_symbol_check(species)
-    forbidden_symbol_check(parameters)
-    species, parameters, pairs
-end
-
-function parse_expr!(parameters, x)
-    esc_dollars!(x)
-    find_parameters_in_rate!(parameters, x)
-    x
-end
-
-dict_expr(pairs) = :(SpeciesValues($([:($k => $v) for (k, v) in pairs]...)))
 
 # parameters
 #___________________________________________________________________________________________________________________________________________________________________________________
