@@ -224,6 +224,10 @@ end
 
 parameter_set(params::ParameterSet) = params
 
+
+# Constructors for different spatial discretisations
+#___________________________________________________________________________________________________________________________________________________________________________________
+
 """
 Construct a SplitODEProblem to solve a reaction diffusion system with reflective boundaries.
 
