@@ -13,6 +13,7 @@ using Symbolics: Num, value, get_variables
 using Catalyst: numspecies, numparams, assemble_oderhs, @species, @parameters, @reaction_network, ExprValues, get_usexpr, get_psexpr, esc_dollars!, find_parameters_in_rate!, forbidden_symbol_check, DEFAULT_IV_SYM, default_t, setmetadata, ReactionSystem
 using ..Util: subst, ensure_function
 using Pipe
+using ..PseudoSpectral: pseudospectral_problem
 
 # TODO CHECK for unnecessary Num conversions! Alternatively add needed Num conversions (and remove from Turing.jl)
 
@@ -250,5 +251,20 @@ function parameter_set(model, params)
 end
 
 parameter_set(params::ParameterSet) = params
+
+"""
+Construct a SplitODEProblem to solve a reaction diffusion system with reflective boundaries.
+
+Returns the SplitODEProblem with solutions in the frequency (DCT-1) domain and a FFTW plan to transform solutions back to the spatial domain.
+"""
+function pseudospectral_problem(model::Model, num_verts; kwargs...)
+    L = domain_size(model)
+    S = species(model)
+    R = reaction_rates(model)
+    D = diffusion_rates(model) / L^2
+    B = -L * boundary_conditions(model) ./ diffusion_rates(model)'
+    I = initial_conditions(model)
+    pseudospectral_problem(S, R, D, B, I, num_verts; kwargs...)
+end
 
 end
