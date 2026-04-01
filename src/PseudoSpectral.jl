@@ -1,13 +1,13 @@
 module PseudoSpectral
-
 export pseudospectral_problem, x
+
 using ..Util: collect_variables, safe_stack
 using ..Models: Model, species, reaction_rates, diffusion_rates, boundary_conditions, initial_conditions
 using SciMLBase: SplitODEProblem, DiagonalOperator, ODEFunction, update_coefficients!, remake
 using FFTW: plan_r2r!, REDFT00, MEASURE
 using Symbolics: @variables, sparsejacobian, build_function, substitute
 
-# const x = only(@variables(x))
+const x = only(@variables(x))
 
 """
 Construct a SplitODEProblem to solve a reaction diffusion system with reflective boundaries.
@@ -35,7 +35,7 @@ function pseudospectral_problem(species, reaction_rates, diffusion_rates, bounda
     fϕ,_ = build_function(ϕ, bs; expression = Val{false})
     fΔϕ,_ = build_function(Δϕ, ds, bs; expression = Val{false})
     
-    R = reaction_operator(species, reaction_rates, rs, plan!)
+    R = reaction_operator(species, reaction_rates, rs, planned)
     D = diffusion_operator(diffusion_rates, ds, n)
     prob = SplitODEProblem(D, R, vec(u), Inf, nothing; kwargs...)
 
@@ -66,7 +66,7 @@ function pseudospectral_problem(species, reaction_rates, diffusion_rates, bounda
     function transform(sol; full_solution=false)
         function f(u)
             u = reshape(u,n,m)
-            plan! * u
+            planned * u
             u .+= sol.prob.p.ϕ
         end
         if full_solution
@@ -88,27 +88,31 @@ Construct a SplitODEProblem to solve a reaction diffusion system with reflective
 Returns the SplitODEProblem with solutions in the frequency (DCT-1) domain and a FFTW plan to transform solutions back to the spatial domain.
 """
 function pseudospectral_problem(model::Model, num_verts; kwargs...)
-
-    pseudospectral_problem(species(model), reaction_rates(model), diffusion_rates(model), boundary_conditions(model), initial_conditions(model), num_verts; kwargs...)
-
+    L = domain_size(model)
+    S = species(model)
+    R = reaction_rates(model)
+    D = diffusion_rates(model) / L^2
+    B = -L * boundary_conditions(model) ./ diffusion_rates(model)'
+    I = initial_conditions(model)
+    pseudospectral_problem(S, R, D, B, I, num_verts; kwargs...)
 end
 
 "Build function for the reaction component, with `f(v+ϕ) + Δϕ` offset for non-zero-flux BCs."
-function reaction_operator(species, reaction_rates, rs, plan!)
-    n,m = size(plan!)
+function reaction_operator(species, reaction_rates, rs, planned)
+    n,m = size(planned)
     @variables u[1:n, 1:m]
     # TODO: Clever things to make only spatially varying parameters expand?
     # Build an nxm matrix of derivatives, substituting reactants for u[i,j] and parameters for p[k,l].
     du = [substitute(expr, Dict([x=>X, zip(species,v)...])) for (v,X) in zip(eachrow(u), range(0,1,n)), expr in reaction_rates]
     _, f! = build_function(du, u, rs; expression=Val{false})
-    function f̂!(du,u,p,t)
-        du = reshape(du,n,m)
+    function f̂!(du, u, p, t)
+        du = reshape(du, n, m)
         copyto!(p.u, u)
-        plan! * p.u
+        planned * p.u
         p.u .+= p.ϕ
         f!(du, p.u, p.r)
         du .+= p.Δϕ
-        plan! * du
+        planned * du
         nothing
     end
     ODEFunction(f̂!)

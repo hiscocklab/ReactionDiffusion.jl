@@ -4,109 +4,32 @@ export Model, species, parameters, reaction_parameters, boundary_parameters, dif
     domain_size, initial_conditions, noise,
     reaction_rates, diffusion_rates,
     @diffusion_system, @initial_conditions,
-    parameter_set, ParameterSet
-
-import ..PseudoSpectral: pseudospectral_problem
-export pseudospectral_problem
+    parameter_set, ParameterSet, ODESystem
 
 import ModelingToolkit # Needed for Catalyst internal DSL macros
-import ModelingToolkit: ODESystem
-export ODESystem
+import Catalyst # Catalyst.species and Catalyst.parameters would conflict with our functions.
 
 using Symbolics: Num, value, get_variables
-import Catalyst # Catalyst.species and Catalyst.parameters would conflict with our functions.
 using Catalyst: numspecies, numparams, assemble_oderhs, @species, @parameters, @reaction_network, ExprValues, get_usexpr, get_psexpr, esc_dollars!, find_parameters_in_rate!, forbidden_symbol_check, DEFAULT_IV_SYM, default_t, setmetadata, ReactionSystem
 using ..Util: subst, ensure_function
 using Pipe
+
 # TODO CHECK for unnecessary Num conversions! Alternatively add needed Num conversions (and remove from Turing.jl)
-"""
-    Model(reaction, diffusion)
 
-An object containing a mathematical description of a reaction diffusion system to be simulated, independent of parameter values.
+# Types
 
-# Fields
-- `reaction::ReactionSystem`
-- `diffusion::DiffusionSystem`
-- `boundary_conditions::(ReactionSystem, ReactionSystem)`
-- `initial_conditions::SpeciesValues`
-
-"""
-struct Model
-    reaction
-    diffusion
-    boundary_conditions
-    initial_conditions
-end
+# SpeciesValues
+#___________________________________________________________________________________________________________________________________________________________________________________
 
 SpeciesValues = Dict{Num,Num}
 
-Model(reaction, diffusion) = Model(reaction, diffusion, (@reaction_network, @reaction_network), SpeciesValues())
-Model(reaction, diffusion, initial::SpeciesValues) = Model(reaction, diffusion, (@reaction_network, @reaction_network), initial)
-Model(reaction, diffusion, boundary::Tuple{ReactionSystem, ReactionSystem}) = Model(reaction, diffusion, boundary, SpeciesValues())
-
-# Don't try to broadcast over a model.
-Base.broadcastable(model::Model) = Ref(model)
-
-# Model getters
-# TODO Eliminate unused getters.
-species(model::Model) = Catalyst.species(model.reaction)
-parameters(model::Model) = union(reaction_parameters(model), diffusion_parameters(model), initial_condition_parameters(model), boundary_parameters(model))
-
-reaction_parameters(model::Model) = Catalyst.parameters(model.reaction)
-diffusion_parameters(model::Model) = parameters(model.diffusion)
-initial_condition_parameters(model::Model) = parameters(model.initial_conditions)
-boundary_parameters(model::Model) = union(Catalyst.parameters.(model.boundary_conditions)...)
-
-reaction_rates(model) = assemble_oderhs(model.reaction, species(model))
-diffusion_rates(model::Model, default=0.0) = [get(model.diffusion.rates, s, default) for s in species(model)]
-initial_conditions(model::Model, default=0.0) = [get(model.initial_conditions, s, default) for s in species(model)]
-
-function boundary_conditions(model::Model)
-    b0, b1 = model.boundary_conditions
-    s = species(model)
-    vcat(assemble_oderhs(b0, s)', assemble_oderhs(b1, s)')
-end
-
-num_species(model::Model) = numspecies(model.reaction)
-num_params(model::Model) = num_reaction_params(model) + num_diffusion_params(model)
-num_reaction_params(model::Model) = numparams(model.reaction)
-num_diffusion_params(model::Model) = length(diffusion_parameters(model))
-
-domain_size(model::Model) = model.diffusion.domain_size
-function domain_size(model::Model, params)
-    L = domain_size(model)
-    L isa Num ? params[nameof(L)] : L
-end
-
-is_fixed_size(model::Model) = typeof(domain_size(model)) != Num # TODO use type system. 
-
-reaction_parameters(model::Model, params, default=0.0) = subst(reaction_parameters(model), params, default)
-#diffusion_parameters(model::Model, params, default=0.0) = get_vector(params, diffusion_parameters(model), default)
-
-function diffusion_rates(model::Model, params::Dict{Symbol, Float64}, default=0.0) # wrong and bad
-    syms = Dict(nameof(p) => p for p in parameters(model))
-    params = Dict(syms[k] => v for (k, v) in params)
-    [(substitute(D, params)) for D in diffusion_rates(model, default)]
-end
-
-function pseudospectral_problem(model, num_verts; kwargs...)
-    L = domain_size(model)
-    S = species(model)
-    R = reaction_rates(model)
-    D = diffusion_rates(model) / L^2
-    B = -L * boundary_conditions(model) ./ diffusion_rates(model)'
-    I = initial_conditions(model)
-    pseudospectral_problem(S, R, D, B, I, num_verts; kwargs...)
-end
-
-ODESystem(model::Model) = convert(ODESystem, model.reaction)
-
+# DiffusionSystem
+#___________________________________________________________________________________________________________________________________________________________________________________
 
 struct DiffusionSystem
     domain_size::Num
     rates::SpeciesValues
 end
-
 
 """
     @diffusion_system L begin D, species;... end
@@ -151,6 +74,86 @@ end
 parameters(ds::DiffusionSystem) = union(get_variables(ds.domain_size), parameters(ds.rates))
 parameters(v::SpeciesValues) = @pipe v |> values .|> get_variables |> union(_..., []) |> Num.(_)
 
+# Model
+#___________________________________________________________________________________________________________________________________________________________________________________
+
+"""
+    Model(reaction, diffusion, boundary_conditions, initial_conditions)
+
+An object containing a mathematical description of a reaction diffusion system to be simulated, independent of parameter values.
+
+# Fields
+- `reaction::ReactionSystem`
+- `diffusion::DiffusionSystem`
+- `boundary_conditions::(ReactionSystem, ReactionSystem)`
+- `initial_conditions::SpeciesValues`
+
+"""
+struct Model
+    reaction
+    diffusion
+    boundary_conditions
+    initial_conditions
+end
+
+Model(reaction, diffusion) = Model(reaction, diffusion, (@reaction_network, @reaction_network), SpeciesValues())
+Model(reaction, diffusion, initial::SpeciesValues) = Model(reaction, diffusion, (@reaction_network, @reaction_network), initial)
+Model(reaction, diffusion, boundary::Tuple{ReactionSystem, ReactionSystem}) = Model(reaction, diffusion, boundary, SpeciesValues())
+
+# Don't try to broadcast over a model.
+Base.broadcastable(model::Model) = Ref(model)
+
+# ODESystem(model::Model)
+#___________________________________________________________________________________________________________________________________________________________________________________
+
+ODESystem(model::Model) = convert(ODESystem, model.reaction)
+
+# Model getters
+#___________________________________________________________________________________________________________________________________________________________________________________
+
+# TODO Eliminate unused getters.
+species(model::Model) = Catalyst.species(model.reaction)
+parameters(model::Model) = union(reaction_parameters(model), diffusion_parameters(model), initial_condition_parameters(model), boundary_parameters(model))
+
+reaction_parameters(model::Model) = Catalyst.parameters(model.reaction)
+diffusion_parameters(model::Model) = parameters(model.diffusion)
+initial_condition_parameters(model::Model) = parameters(model.initial_conditions)
+boundary_parameters(model::Model) = union(Catalyst.parameters.(model.boundary_conditions)...)
+
+reaction_rates(model) = assemble_oderhs(model.reaction, species(model))
+diffusion_rates(model::Model, default=0.0) = [get(model.diffusion.rates, s, default) for s in species(model)]
+initial_conditions(model::Model, default=0.0) = [get(model.initial_conditions, s, default) for s in species(model)]
+
+function boundary_conditions(model::Model)
+    b0, b1 = model.boundary_conditions
+    s = species(model)
+    vcat(assemble_oderhs(b0, s)', assemble_oderhs(b1, s)')
+end
+
+num_species(model::Model) = numspecies(model.reaction)
+num_params(model::Model) = num_reaction_params(model) + num_diffusion_params(model)
+num_reaction_params(model::Model) = numparams(model.reaction)
+num_diffusion_params(model::Model) = length(diffusion_parameters(model))
+
+domain_size(model::Model) = model.diffusion.domain_size
+function domain_size(model::Model, params)
+    L = domain_size(model)
+    L isa Num ? params[nameof(L)] : L
+end
+
+is_fixed_size(model::Model) = typeof(domain_size(model)) != Num # TODO use type system. 
+
+reaction_parameters(model::Model, params, default=0.0) = subst(reaction_parameters(model), params, default)
+#diffusion_parameters(model::Model, params, default=0.0) = get_vector(params, diffusion_parameters(model), default)
+
+function diffusion_rates(model::Model, params::Dict{Symbol, Float64}, default=0.0) # wrong and bad
+    syms = Dict(nameof(p) => p for p in parameters(model))
+    params = Dict(syms[k] => v for (k, v) in params)
+    [(substitute(D, params)) for D in diffusion_rates(model, default)]
+end
+
+# Initialisers
+#___________________________________________________________________________________________________________________________________________________________________________________
 
 """
     @initial_conditions begin IC, species;... end
@@ -206,6 +209,9 @@ function parse_expr!(parameters, x)
 end
 
 dict_expr(pairs) = :(SpeciesValues($([:($k => $v) for (k, v) in pairs]...)))
+
+# parameters
+#___________________________________________________________________________________________________________________________________________________________________________________
 
 ParameterSet = Dict{Num, Float64}
 
