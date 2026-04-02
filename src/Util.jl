@@ -1,6 +1,6 @@
 module Util
 using Pipe: @pipe
-using Catalyst: @species, @parameters, isspecies
+using Catalyst: @species, @parameters, isspecies, ExprValues
 using Symbolics: get_variables, Num
 using Base.Threads: @threads
 
@@ -113,36 +113,5 @@ function safe_stack(iter::Union{AbstractVector{T}, Base.Generator{<:AbstractVect
         stack(iter; dims=dims)
     end
 end
+
 end
-
-# Macros
-# ________________________________________________________________________________________________________
-
-function parse_body(body, source)
-    Base.remove_linenums!(body)
-    parameters = ExprValues[]
-    species = ExprValues[]
-    pairs = Pair{ExprValues, ExprValues}[]
-
-    for b in body.args
-        r, s = b.args
-        # Handle interpolation of variables
-        r = parse_expr!(parameters,r)
-        s = esc_dollars!(s)
-        push!(pairs, s => r)
-        push!(species, s)
-    end
-
-    forbidden_symbol_check(species)
-    forbidden_symbol_check(parameters)
-    species, parameters, pairs
-end
-
-function parse_expr!(parameters, x)
-    esc_dollars!(x)
-    find_parameters_in_rate!(parameters, x)
-    x
-end
-
-dict_expr(pairs) = :(SpeciesValues($([:($k => $v) for (k, v) in pairs]...)))
-

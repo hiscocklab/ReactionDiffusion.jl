@@ -43,7 +43,7 @@ function pseudospectral_problem(species, reaction_rates, diffusion_rates, bounda
             fΔϕ,_ = build_function(Δϕ, ds,bs; expression=Val{false})
         end
         
-        R = reaction_operator(species, reaction_rates, rs, plan!, Val(BC))
+        R = reaction_operator(species, reaction_rates, rs, plan, Val(BC))
         D = diffusion_operator(diffusion_rates, ds, n)
         prob = SplitODEProblem(D, R, vec(u), Inf, nothing; kwargs...)
 
@@ -62,7 +62,7 @@ function pseudospectral_problem(species, reaction_rates, diffusion_rates, bounda
             else
                 ϕ = Δϕ = Matrix{Float64}(undef,n,m)
             end
-            plan! * u0
+            plan * u0
             u0 = vec(u0)
             w = Matrix{Float64}(undef,n,m) # Allocate working memory for FFTW.
             p = Parameters(w,r,d,ϕ,Δϕ,attempt)
@@ -76,7 +76,7 @@ function pseudospectral_problem(species, reaction_rates, diffusion_rates, bounda
         function transform(sol; full_solution=false)
             function f(u)
                 u = reshape(u,n,m)
-                plan! * u
+                plan * u
                 BC && (u .+= sol.prob.p.ϕ)
                 u
             end
@@ -97,8 +97,8 @@ function pseudospectral_problem(species, reaction_rates, diffusion_rates, bounda
 end
 
 "Build function for the reaction component, with `f(v+ϕ) + Δϕ` offset for non-zero-flux BCs."
-function reaction_operator(species, reaction_rates, rs, plan)
-    n,m = size(plan)
+function reaction_operator(species, reaction_rates, rs, plan!, ::Val{BC}) where BC
+    n,m = size(plan!)
     @variables u[1:n, 1:m]
     # TODO: Clever things to make only spatially varying parameters expand?
     # Build an nxm matrix of derivatives, substituting reactants for u[i,j] and parameters for p[k,l].
@@ -108,11 +108,11 @@ function reaction_operator(species, reaction_rates, rs, plan)
     function f̂!(du,u,p,t)
         du = reshape(du,n,m)
         copyto!(p.u, u)
-        plan * p.u
+        plan! * p.u
         BC && (p.u .+= p.ϕ)
         f!(du, p.u, p.r)
         BC && (du .+= p.Δϕ)
-        plan * du
+        plan! * du
         nothing
     end
     ODEFunction(f̂!)

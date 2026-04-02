@@ -286,4 +286,36 @@ function mol_problem(model, num_verts; noise=1e-4, kwargs...)
     @named pdesys = PDESystem(eqs, bcs, domains, [t, x], S_tx, ps; defaults=p0)
     discretize(pdesys, MOLFiniteDifference([x => 1/(num_verts-1)], t))
 end
+
+# Macro functions
+# ________________________________________________________________________________________________________
+
+function parse_body(body, source)
+    Base.remove_linenums!(body)
+    parameters = ExprValues[]
+    species = ExprValues[]
+    pairs = Pair{ExprValues, ExprValues}[]
+
+    for b in body.args
+        r, s = b.args
+        # Handle interpolation of variables
+        r = parse_expr!(parameters,r)
+        s = esc_dollars!(s)
+        push!(pairs, s => r)
+        push!(species, s)
+    end
+
+    forbidden_symbol_check(species)
+    forbidden_symbol_check(parameters)
+    species, parameters, pairs
+end
+
+function parse_expr!(parameters, x)
+    esc_dollars!(x)
+    find_parameters_in_rate!(parameters, x)
+    x
+end
+
+dict_expr(pairs) = :(SpeciesValues($([:($k => $v) for (k, v) in pairs]...)))
+
 end
