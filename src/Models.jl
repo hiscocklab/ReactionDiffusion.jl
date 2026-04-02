@@ -4,16 +4,30 @@ export Model, species, parameters, reaction_parameters, boundary_parameters, dif
     domain_size, initial_conditions, noise,
     reaction_rates, diffusion_rates,
     @diffusion_system, @initial_conditions,
-    parameter_set, ParameterSet, ODESystem
+    parameter_set, ParameterSet,
+    mol_problem
 
-import ModelingToolkit # Needed for Catalyst internal DSL macros
+## Extended methods
+import ..PseudoSpectral: pseudospectral_problem
+export pseudospectral_problem
+
+import ModelingToolkit: ODESystem
+export ODESystem
+##
+
+using Symbolics: Num, value, get_variables, @variables, getname, substitute
 import Catalyst # Catalyst.species and Catalyst.parameters would conflict with our functions.
-
-using Symbolics: Num, value, get_variables
-using Catalyst: numspecies, numparams, assemble_oderhs, @species, @parameters, @reaction_network, ExprValues, get_usexpr, get_psexpr, esc_dollars!, find_parameters_in_rate!, forbidden_symbol_check, DEFAULT_IV_SYM, default_t, setmetadata, ReactionSystem
-using ..Util: subst, ensure_function, parse_body, parse_expr!, dict_expr
+using Catalyst: numspecies, numparams, assemble_oderhs, @species, @parameters, @reaction_network, ExprValues, get_usexpr, get_psexpr, esc_dollars!, find_parameters_in_rate!, forbidden_symbol_check, DEFAULT_IV_SYM, default_t, setmetadata, ReactionSystem, independent_variable
+import ModelingToolkit # Needed for internal Catalyst functions.
+using ..Util: subst, ensure_function, zip_dict
 using Pipe
-using ..PseudoSpectral: pseudospectral_problem
+
+
+## MOL
+using ModelingToolkit: Differential, PDESystem, @named
+using SciMLBase: discretize
+using MethodOfLines: MOLFiniteDifference#
+##
 
 # TODO CHECK for unnecessary Num conversions! Alternatively add needed Num conversions (and remove from Turing.jl)
 
@@ -86,14 +100,14 @@ An object containing a mathematical description of a reaction diffusion system t
 # Fields
 - `reaction::ReactionSystem`
 - `diffusion::DiffusionSystem`
-- `boundary_conditions::(ReactionSystem, ReactionSystem)`
+- `boundary_flux::(ReactionSystem, ReactionSystem)`
 - `initial_conditions::SpeciesValues`
 
 """
 struct Model
     reaction
     diffusion
-    boundary_conditions
+    boundary_flux
     initial_conditions
 end
 
@@ -119,14 +133,14 @@ parameters(model::Model) = union(reaction_parameters(model), diffusion_parameter
 reaction_parameters(model::Model) = Catalyst.parameters(model.reaction)
 diffusion_parameters(model::Model) = parameters(model.diffusion)
 initial_condition_parameters(model::Model) = parameters(model.initial_conditions)
-boundary_parameters(model::Model) = union(Catalyst.parameters.(model.boundary_conditions)...)
+boundary_parameters(model::Model) = union(Catalyst.parameters.(model.boundary_flux)...)
 
 reaction_rates(model) = assemble_oderhs(model.reaction, species(model))
 diffusion_rates(model::Model, default=0.0) = [get(model.diffusion.rates, s, default) for s in species(model)]
 initial_conditions(model::Model, default=0.0) = [get(model.initial_conditions, s, default) for s in species(model)]
 
-function boundary_conditions(model::Model)
-    b0, b1 = model.boundary_conditions
+function boundary_flux(model::Model)
+    b0, b1 = model.boundary_flux
     s = species(model)
     vcat(assemble_oderhs(b0, s)', assemble_oderhs(b1, s)')
 end
@@ -233,14 +247,43 @@ Construct a SplitODEProblem to solve a reaction diffusion system with reflective
 
 Returns the SplitODEProblem with solutions in the frequency (DCT-1) domain and a FFTW plan to transform solutions back to the spatial domain.
 """
-function pseudospectral_problem(model::Model, num_verts; kwargs...)
+function pseudospectral_problem(model, num_verts; kwargs...)
     L = domain_size(model)
     S = species(model)
     R = reaction_rates(model)
-    D = diffusion_rates(model) / L^2
-    B = -L * boundary_conditions(model) ./ diffusion_rates(model)'
+    D = diffusion_rates(model)/L^2
+    B = -L * boundary_flux(model) ./ diffusion_rates(model)'
     I = initial_conditions(model)
     pseudospectral_problem(S, R, D, B, I, num_verts; kwargs...)
 end
+                              
+function mol_problem(model, num_verts; noise=1e-4, kwargs...)
+    @parameters t x
+    Dt = Differential(t)
+    Dx = Differential(x)
+    Dxx = Differential(x)^2
+    L = domain_size(model)
+    S= species(model)
+    R = reaction_rates(model)
+    D = diffusion_rates(model)/L^2
+    B = -L * boundary_flux(model) ./ diffusion_rates(model)'
+    I = initial_conditions(model)
+    ps = parameters(model)
 
+    names = model |> species .|> getname
+    S_f = [only(@variables $n(..)) for n in names]
+    S_tx = [u(t,x) for u in S_f]
+    R_tx = [substitute(r, zip_dict(S,S_tx)) for r in R]
+
+    eqs = [Dt(u) ~ r + d * Dxx(u) for (u,r,d) in zip(S_tx, R_tx, D)]
+    ics = [u(0,x) ~ ic for (u,ic) in zip(S_f,I)]
+    bcs0 = [Dx(u(t,0)) ~ bc for (u,bc) in zip(S_f,B[1,:])]
+    bcs1 = [Dx(u(t,1)) ~ bc for (u,bc) in zip(S_f,B[2,:])]
+    bcs = [ics; bcs0; bcs1]
+   
+    domains = [t ∈ (0.0, 5e5), x ∈ (0.0, 1.0)]
+    p0 = zip_dict(ps, zeros(length(ps)))
+    @named pdesys = PDESystem(eqs, bcs, domains, [t, x], S_tx, ps; defaults=p0)
+    discretize(pdesys, MOLFiniteDifference([x => 1/(num_verts-1)], t))
+end
 end

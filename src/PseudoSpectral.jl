@@ -21,64 +21,79 @@ function pseudospectral_problem(species, reaction_rates, diffusion_rates, bounda
     rs, ds, bs, is = (setdiff(collect_variables(exprs), x, species) for exprs in (reaction_rates, diffusion_rates, vec(boundary_conditions), initial_conditions))
 
     u = Matrix{Float64}(undef, n, m)
-    plan = 1 / sqrt(2 * (n - 1)) * plan_r2r!(u, REDFT00, 1; flags=MEASURE)
+    plan = 1/sqrt(2*(n-1)) * plan_r2r!(u, REDFT00, 1; flags=MEASURE)
 
-    ## Offsets for constant, non-zero flux boundary conditions.
-    # For u′(0) = a, u′(1) = b,
-    # define ϕ as a smooth function such that ϕ′(0) = a, ϕ′(1) = b, and write v = u - ϕ.
-    # Then v′(0) = 0, v′(1) = 0, so we can solve for v using DCT-I.
-    a, b = eachrow(boundary_conditions)
-    X = range(0.0, 1.0, n)
-    ϕ = X.^2 * (b' - a') / 2 + X * a'
-    Δϕ = ((b - a) .* diffusion_rates)' |> collect
-    fϕ,_ = build_function(ϕ, bs; expression = Val{false})
-    fΔϕ,_ = build_function(Δϕ, ds, bs; expression = Val{false})
-    
-    R = reaction_operator(species, reaction_rates, rs, plan)
-    D = diffusion_operator(diffusion_rates, ds, n)
-    prob = SplitODEProblem(D, R, vec(u), Inf, nothing; kwargs...)
 
-    u0 = [substitute(ic, x => X) for X in range(0, 1, n), ic in initial_conditions]
+    u0 = [substitute(ic, x=>X) for X in range(0,1,n), ic in initial_conditions]
     _fu0,_= build_function(u0, is; expression=Val{false})
-    fu0(i) = _fu0(i) + noise * abs.(randn(n, m))
+    fu0(i) = _fu0(i) + noise*abs.(randn(n,m))
 
-    # Function to set parameter values.
-    function make_problem(params, attempt=1; kwargs...)
-        r = Float64[params[k] for k in rs]
-        d = Float64[params[k] for k in ds]
-        b = Float64[params[k] for k in bs]
-        i = Float64[params[k] for k in is]
-        local ϕ = fϕ(b)
-        local Δϕ = fΔϕ(d, b)
-        local u0 = fu0(i) - ϕ
-        plan * u0
-        u0 = vec(u0)
-        w = Matrix{Float64}(undef, n, m) # Allocate working memory for FFTW.
-        p = Parameters(w, r, d, ϕ, Δϕ, attempt)
-        update_coefficients!(prob.f.f1.f, u0, p, 0.0) # Set parameter values in diffusion operator.
-        remake(prob; p = p, u0 = u0, kwargs...) # Set parameter values in SplitODEProblem.
-    end     
-
-
-    # Function to transform output back to spatial domain.
-    # TODO: Avoid unnecessary allocation.
-    function transform(sol; full_solution=false)
-        function f(u)
-            u = reshape(u,n,m)
-            plan * u
-            u .+= sol.prob.p.ϕ
+    # Dispatch on `iszero(boundary_conditions)`
+    function dispatch_bcs(::Val{BC}) where BC
+        ## Offsets for constant, non-zero flux boundary conditions.
+        # For u′(0) = a, u′(1) = b,
+        # define ϕ as a smooth function such that ϕ′(0) = a, ϕ′(1) = b, and write v = u - ϕ.
+        # Then v′(0) = 0, v′(1) = 0, so we can solve for v using DCT-I.
+        if BC
+            a,b = eachrow(boundary_conditions)
+            X = range(0.0,1.0,n)
+            ϕ = X.^2 * (b'-a')/2 + X * a'
+            Δϕ = ((b-a).*diffusion_rates)' |> collect
+            fϕ,_ = build_function(ϕ, bs; expression=Val{false})
+            fΔϕ,_ = build_function(Δϕ, ds,bs; expression=Val{false})
         end
-        if full_solution
-            u = stack(f.(sol.u))
-            t = sol.t
-        else
-            u = f(sol.u[end])
-            t = sol.t[end]
+        
+        R = reaction_operator(species, reaction_rates, rs, plan!, Val(BC))
+        D = diffusion_operator(diffusion_rates, ds, n)
+        prob = SplitODEProblem(D, R, vec(u), Inf, nothing; kwargs...)
+
+        # Function to set parameter values.
+        function make_problem(params, attempt=1; kwargs...)
+            r = Float64[params[k] for k in rs]
+            d = Float64[params[k] for k in ds]
+            b = Float64[params[k] for k in bs]
+            i = Float64[params[k] for k in is]
+            local u0 = fu0(i)
+            local ϕ, Δϕ
+            if BC
+                ϕ = fϕ(b)
+                Δϕ = fΔϕ(d,b)
+                u0 .-= ϕ
+            else
+                ϕ = Δϕ = Matrix{Float64}(undef,n,m)
+            end
+            plan! * u0
+            u0 = vec(u0)
+            w = Matrix{Float64}(undef,n,m) # Allocate working memory for FFTW.
+            p = Parameters(w,r,d,ϕ,Δϕ,attempt)
+            update_coefficients!(prob.f.f1.f, u0, p, 0.0) # Set parameter values in diffusion operator.
+            remake(prob; p=p, u0=u0, kwargs...) # Set parameter values in SplitODEProblem.
+        end     
+
+
+        # Function to transform output back to spatial domain.
+        # TODO: Avoid unnecessary allocation.
+        function transform(sol; full_solution=false)
+            function f(u)
+                u = reshape(u,n,m)
+                plan! * u
+                BC && (u .+= sol.prob.p.ϕ)
+                u
+            end
+            if full_solution
+                u = stack(f.(sol.u))
+                t = sol.t
+            else
+                u = f(sol.u[end])
+                t = sol.t[end]
+            end
+            (u,t)
         end
-        (u,t)
+
+        make_problem, transform
     end
-
-    make_problem, transform
+    
+    dispatch_bcs(Val(!iszero(boundary_conditions)))
 end
 
 "Build function for the reaction component, with `f(v+ϕ) + Δϕ` offset for non-zero-flux BCs."
@@ -89,18 +104,20 @@ function reaction_operator(species, reaction_rates, rs, plan)
     # Build an nxm matrix of derivatives, substituting reactants for u[i,j] and parameters for p[k,l].
     du = [substitute(expr, Dict([x=>X, zip(species,v)...])) for (v,X) in zip(eachrow(u), range(0,1,n)), expr in reaction_rates]
     _, f! = build_function(du, u, rs; expression=Val{false})
-    function f̂!(du, u, p, t)
-        du = reshape(du, n, m)
+    
+    function f̂!(du,u,p,t)
+        du = reshape(du,n,m)
         copyto!(p.u, u)
         plan * p.u
-        p.u .+= p.ϕ
+        BC && (p.u .+= p.ϕ)
         f!(du, p.u, p.r)
-        du .+= p.Δϕ
+        BC && (du .+= p.Δϕ)
         plan * du
         nothing
     end
     ODEFunction(f̂!)
-end 
+end
+
 "Build linear operator for the diffusion component."
 function diffusion_operator(diffusion_rates, ps, n)
     k = 0:n-1 # Wavenumbers

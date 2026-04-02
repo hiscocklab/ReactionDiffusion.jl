@@ -19,3 +19,5 @@
 + Use observables.
 + Use @ivs for x.
 - Show results for different parameters on the same plot.
+- Use `getname` instead of `nameof`.
+- Allow models to be input as equations.

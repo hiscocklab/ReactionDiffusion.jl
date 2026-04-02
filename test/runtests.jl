@@ -12,7 +12,7 @@ end
 
 dynamic_range(u) = maximum(u)/minimum(u) 
 
-
+##
 @testset "turing_wavelength" begin
     model = Schnakenberg.model
     params = product(a = range(0.0,0.6,4), b = range(0.0,3.0,4), γ = [1.0], Dᵤ = [1.0], Dᵥ = [50.0], L = [100.0])
@@ -40,6 +40,18 @@ end
     #               (even when setting seeds, it's not clear that Pkg updates to random will conserve values).
     @test 1.5 < dynamic_range(u) < 4
     @test num_periods(u) ≈ expected_periods rtol=0.1
+end
+
+@testset "MOL" begin
+    model = Schnakenberg.model
+    params = dict(a = 0.2, b = 2.0, γ = 1.0, Dᵤ = 1.0, Dᵥ = 50.0, L=100.0)
+    expected_periods = 1/turing_wavelength(model,params)
+    u,t = simulate(model, params; seed = 10)
+    u_mol,t_mol = simulate(model, params; discretisation=:mol, seed=10, reltol=1e-4)
+
+    u = u[:,1]
+    u_mol = u_mol[:,1]
+    @test maximum(abs.(u_mol-u)) < 0.15
 end
 
 @testset "initial conditions" begin
