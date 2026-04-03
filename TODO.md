@@ -22,7 +22,7 @@
 - use @debug for output such as repeated attempts.
 - Use @ivs for x.
 
-# Plotting
+## Plotting
 
 - Use LaTeX to label plots.
 - Normalise plots by range instead of norm
