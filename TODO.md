@@ -25,7 +25,7 @@
 ## Plotting
 
 - Use LaTeX to label plots.
-- Normalise plots by range instead of norm
+- ~~Normalise plots by range instead of norm~~
 - Combine time series and interactive plots.
 - Use observables.
 - Show results for different parameters on the same plot.

@@ -14,10 +14,9 @@ using Observables
 Simulate and plot the results. The remaining `kwargs` are passed to `simulate`.
 """
 function timeseries_plot(model, params; normalise=true, hide_y=true, autolimits=true, species=nothing, kwargs...)
-    u,t=simulate(model,params; full_solution=true, kwargs...)
-    timeseries_plot(model, u,t; normalise=normalise, hide_y=hide_y, autolimits=autolimits, species=species)
+    u, t = simulate(model, params; full_solution = true, kwargs...)
+    timeseries_plot(model, u, t; normalise = normalise, hide_y = hide_y, autolimits = autolimits, species = species)
 end
-
 
 """
     function timeseries_plot(model, u, t; normalise=true, hide_y=true, autolimits=true, kwargs...)
@@ -27,6 +26,7 @@ Display a solution in an interactive plot with a scrubber to move through time.
 If `normalise` is true, values for different species will be normalised to a common scale.
 """
 function timeseries_plot(model, u, t; normalise=true, hide_y=true, autolimits=true, species=nothing, kwargs...)
+    
     model_species = Models.species(model)
     if isnothing(species)
         labels = [string(s.f) for s in model_species]
@@ -37,21 +37,28 @@ function timeseries_plot(model, u, t; normalise=true, hide_y=true, autolimits=tr
     end
 
     x_steps = size(u, 1)
-    x = range(0.0,1.0,length=x_steps)
-	r = normalise ? norm.(eachslice(u, dims=(2,3))) : ones(size(u)[2:3])
-	fig=Figure()
-	ax = Axis(fig[1,1])
+    x = range(0.0, 1.0, length = x_steps)
+	r = normalise ? maximum.(eachslice(u, dims = 2)) : ones(size(u)[2:3]) # find max value for each species across all time
+
+	fig = Figure()
+	ax = Axis(fig[1,1], xlabel = "x / L", ylabel = "Concentration") # TODO have axis labels passed in as kwargs
 	hide_y && hideydecorations!(ax)
-    sg = SliderGrid(fig[2,1], (label="t",range=eachindex(t), format=i->@sprintf("%.2f",t[i])))
-    sl=sg.sliders[1]
+    sg = SliderGrid(fig[2,1], (label = "t", range = eachindex(t), format = i -> @sprintf("%.2f", t[i])))
+
+    sl = sg.sliders[1]
 	T = lift(i -> t[i], sl.value)
-	U = [lift(i -> u[:,i]/r[i], sl.value) for (u,r) in zip(eachslice(u, dims=2), eachrow(r))]
-	for (U,label) in zip(U,labels)
-		lines!(ax,x,U, label=label)
+	U = [lift(i -> u[:, i] / r, sl.value) for (u, r) in zip(eachslice(u, dims = 2), r)]
+	for (U, label) in zip(U, labels)
+		lines!(ax, x, U, label = label)
 	end
-	autolimits && on(sl.value) do _
+
+	!normalise && autolimits && on(sl.value) do _
 	    autolimits!(ax)
 	end
+
+    dy = 0.05 # padding of the plot in y
+    normalise ? ylims!(ax, -dy, 1 + dy) : nothing
+
 	axislegend(ax)
     display(fig)
     fig
@@ -64,33 +71,38 @@ Generate an interactive plot of the steady state solution with sliders to adjust
 `param_ranges` should be a dictionary mapping parameter names to either `Range` objects or collections of possible values.
 """
 function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_verts=32, kwargs...)
+
     simulate_ = simulate(model; num_verts=num_verts, kwargs...)
     function f(vals...)
-        params = Dict(k => x isa Int ? v[x] : x for ((k,v), x) in zip(param_ranges,vals))
-        u,t = parameter_set(model,params) |> simulate_
-        r = norm.(eachcol(u))
+        params = Dict(k => x isa Int ? v[x] : x for ((k, v), x) in zip(param_ranges, vals))
+        u,t = parameter_set(model, params) |> simulate_
+        r = maximum.(eachcol(u))
         normalise ? u ./ r' : u
     end
     
-	fig=Figure()
-	ax = Axis(fig[1,1])
+	fig = Figure()
+	ax = Axis(fig[1,1], xlabel = "x / L", ylabel = "Concentration") # TODO have axis labels passed in as kwargs
 	hide_y && hideydecorations!(ax)
 
     param_ranges = sort(param_ranges)
-    slider_specs = [eltype(v) <: AbstractFloat ? (label=string(k), range = v, format = x->@sprintf("%.2f",x)) : (label=string(k), range = 1:length(v)) for (k,v) in param_ranges]
+    slider_specs = [eltype(v) <: AbstractFloat ? (label=string(k), range = v, format = x -> @sprintf("%.2f",x)) : (label=string(k), range = 1:length(v)) for (k,v) in param_ranges]
 
     sg = SliderGrid(fig[1,2], slider_specs...)
 
     U = lift(f, (sl.value for sl in sg.sliders)...)
-    U = throttle(1/120, U) # Limit update rate to 120Hz
-    x = range(0,1,num_verts)
+    U = throttle(1 / 120, U) # Limit update rate to 120Hz
+    x = range(0, 1, num_verts)
     labels = [string(s.f) for s in species(model)]
     for i in eachindex(eachcol(U[]))
-        lines!(ax, x, lift(u -> u[:,i], U); label=labels[i])
+        lines!(ax, x, lift(u -> u[:, i], U); label=labels[i])
     end
-    on(U) do _
+
+    !normalise && on(U) do _
 	    autolimits!(ax)
 	end
+    dy = 0.05 # padding of the plot in y
+    normalise ? ylims!(ax, -dy, 1 + dy) : nothing
+
     axislegend(ax)
     display(fig)
     fig
