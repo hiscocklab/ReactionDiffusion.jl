@@ -71,25 +71,33 @@ Generate an interactive plot of the steady state solution with sliders to adjust
 `param_ranges` should be a dictionary mapping parameter names to either `Range` objects or collections of possible values.
 """
 function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_verts=32, kwargs...)
+	fig = Figure()
+    layout = make_layout(fig)
+    ax = Axis(layout.ax, title=name(model), xlabel = "x / L", ylabel = "Concentration")
+    hide_y && hideydecorations!(ax)
+    param_sliders = make_param_sliders(layout.param_sliders, param_ranges)
+    save_button = Button(layout.save_button, label="🖫", font="Segoe UI Symbol")
+    annotate_button = Button(layout.annotate_button, label="👁", font="Segoe UI Symbol")
+    t= 0.0:0.1:10.0 # Test value
+    t_slider = SliderGrid(layout.t_slider, (label = "t", range = 0.0:1.0, format = "{:.2f}"))
+    play_button = Button(layout.play_button; label="⏯")
+    reset_button = Button(layout.reset_button; label="⏮")
+    skip_button = Button(layout.skip_button; label="⏭")
+    record_button = Button(layout.record_button; label="⏺", font="Segoe UI Symbol")
+    capture_button = Button(layout.capture_button; label="📷", font="Segoe UI Symbol")
 
-    simulate_ = simulate(model; num_verts=num_verts, kwargs...)
+    T = only(t_slider.sliders).value
+
+
+    _step! = make_integrator(model; num_verts=num_verts, kwargs...)
     function f(vals...)
         params = Dict(k => x isa Int ? v[x] : x for ((k, v), x) in zip(param_ranges, vals))
-        u,t = parameter_set(model, params) |> simulate_
+        u,t = parameter_set(model, params) |> _step!
         r = maximum.(eachcol(u))
         normalise ? u ./ r' : u
     end
     
-	fig = Figure()
-	ax = Axis(fig[1,1], xlabel = "x / L", ylabel = "Concentration") # TODO have axis labels passed in as kwargs
-	hide_y && hideydecorations!(ax)
-
-    param_ranges = sort(param_ranges)
-    slider_specs = [eltype(v) <: AbstractFloat ? (label=string(k), range = v, format = x -> @sprintf("%.2f",x)) : (label=string(k), range = 1:length(v)) for (k,v) in param_ranges]
-
-    sg = SliderGrid(fig[1,2], slider_specs...)
-
-    U = lift(f, (sl.value for sl in sg.sliders)...)
+    U = lift(f, (sl.value for sl in param_sliders.sliders)...)
     U = throttle(1 / 120, U) # Limit update rate to 120Hz
     x = range(0, 1, num_verts)
     labels = [string(s.f) for s in species(model)]
@@ -103,8 +111,36 @@ function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_
     dy = 0.05 # padding of the plot in y
     normalise ? ylims!(ax, -dy, 1 + dy) : nothing
 
-    axislegend(ax)
+    legend = Legend(layout.legend, ax; orientation= :horizontal)
     display(fig)
     fig
+end
+
+function make_layout(fig)
+    body = fig[1,1]
+        plot_pane = body[1,1]
+            ax = plot_pane[1,1]
+            legend_bar = plot_pane[2,1]
+                legend = legend_bar[1,1]
+                param_buttons = legend_bar[1,2]
+                    save_button = param_buttons[1,1]
+                    annotate_button = param_buttons[1,2]
+        param_sliders = body[1,2]
+    control_bar = fig[2,1]
+        t_slider = control_bar[1,1]
+        control_buttons = control_bar[1,2]
+            play_button = control_buttons[1,1]
+            reset_button = control_buttons[1,2]
+            skip_button = control_buttons[1,3]
+            record_button = control_buttons[1,4]
+            capture_button = control_buttons[1,5]
+    (;ax, legend, save_button, annotate_button, param_sliders, t_slider,
+        play_button, reset_button, skip_button, record_button, capture_button)
+end
+
+function make_param_sliders(f, param_ranges)
+    param_ranges = sort(param_ranges)
+    slider_specs = [eltype(v) <: AbstractFloat ? (label=string(k), range = v, format = x -> @sprintf("%.2f",x)) : (label=string(k), range = 1:length(v)) for (k,v) in param_ranges]
+    SliderGrid(f, slider_specs...)
 end
 end

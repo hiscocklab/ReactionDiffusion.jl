@@ -2,7 +2,7 @@ module PseudoSpectral
 export pseudospectral_problem, x
 
 using ..Util: collect_variables, safe_stack
-using SciMLBase: SplitODEProblem, DiagonalOperator, ODEFunction, update_coefficients!, remake
+using SciMLBase: SplitODEProblem, ODEProblem, DiagonalOperator, ODEFunction, update_coefficients!, remake
 using FFTW: plan_r2r!, REDFT00, MEASURE
 using Symbolics: @variables, sparsejacobian, build_function, substitute
 
@@ -47,50 +47,56 @@ function pseudospectral_problem(species, reaction_rates, diffusion_rates, bounda
         D = diffusion_operator(diffusion_rates, ds, n)
         prob = SplitODEProblem(D, R, vec(u), Inf, nothing; kwargs...)
 
-        # Function to set parameter values.
-        function make_problem(params, attempt=1; kwargs...)
+
+        function make_params(params, attempt)
             r = Float64[params[k] for k in rs]
             d = Float64[params[k] for k in ds]
             b = Float64[params[k] for k in bs]
-            i = Float64[params[k] for k in is]
-            local u0 = fu0(i)
+            
             local ϕ, Δϕ
             if BC
                 ϕ = fϕ(b)
                 Δϕ = fΔϕ(d,b)
-                u0 .-= ϕ
             else
                 ϕ = Δϕ = Matrix{Float64}(undef,n,m)
             end
-            plan * u0
-            u0 = vec(u0)
             w = Matrix{Float64}(undef,n,m) # Allocate working memory for FFTW.
-            p = Parameters(w,r,d,ϕ,Δϕ,attempt)
-            update_coefficients!(prob.f.f1.f, u0, p, 0.0) # Set parameter values in diffusion operator.
-            remake(prob; p=p, u0=u0, kwargs...) # Set parameter values in SplitODEProblem.
-        end     
+            Parameters(w,r,d,ϕ,Δϕ,attempt)
+        end
+
+        # Function to set parameter values. TODO Split up somehow.
+        function _remake(obj, params; attempt=1, reset=false, kwargs...)
+            p = make_params(params, attempt)
+            local u0
+            if reset
+                i = Float64[params[k] for k in is]
+                u0 = fu0(i)
+                BC && (u0 .-= p.ϕ)
+                plan * u0
+                u0 = vec(u0)
+            end
+            
+            update_coefficients!(obj.f.f1.f, nothing, p, nothing) # Set parameter values in diffusion operator.
+            if obj isa ODEProblem
+                remake(obj; p=p, u0=(reset ? u0 : nothing), kwargs...) # Set parameter values in SplitODEProblem.
+            else
+                obj.p = p
+                reset && reinit!(obj, u0)
+            end
+        end
+
+        _remake(params; attempt=1, kwargs...) = _remake(prob, params; attempt, reset=true, kwargs...)
 
 
         # Function to transform output back to spatial domain.
-        # TODO: Avoid unnecessary allocation.
-        function transform(sol; full_solution=false)
-            function f(u)
-                u = reshape(u,n,m)
-                plan * u
-                BC && (u .+= sol.prob.p.ϕ)
-                u
-            end
-            if full_solution
-                u = stack(f.(sol.u))
-                t = sol.t
-            else
-                u = f(sol.u[end])
-                t = sol.t[end]
-            end
-            (u,t)
+        function _transform(u)
+            u = reshape(u,n,m)
+            plan * u
+            BC && (u .+= sol.prob.p.ϕ)
+            u
         end
 
-        make_problem, transform
+        _remake, _transform
     end
     
     dispatch_bcs(Val(!iszero(boundary_conditions)))

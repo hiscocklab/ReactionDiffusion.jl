@@ -23,7 +23,7 @@ diffusion = @diffusion_system L begin
 end
 
 ## Combine `reaction` and `diffusion` into a single `Model` object.
-model = Model(reaction, diffusion)
+model = Model(reaction, diffusion; name="Maternal Gradients")
 
 ## Pick some parameter sets to test.
 params = dict(
@@ -42,7 +42,7 @@ params = dict(
 )
 
 ## Simulate the system with one of the "good" parameter sets and plot the results over time. 
-timeseries_plot(model, params; abstol=1e-3)
+# timeseries_plot(model, params; abstol=1e-3)
 
 ## Define some plausible ranges of parameter values to explore.
 param_ranges = dict(

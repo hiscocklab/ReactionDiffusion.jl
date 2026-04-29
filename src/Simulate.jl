@@ -1,10 +1,10 @@
 module Simulate
-export simulate
+export simulate, make_integrator
 
 using ..Models
 using ..PseudoSpectral
 using ..Util: issingle
-using SciMLBase: solve, successful_retcode, EnsembleProblem, EnsembleSolution, DiscreteCallback, terminate!, get_du, remake
+using SciMLBase: solve, init, step!, successful_retcode, EnsembleProblem, EnsembleSolution, DiscreteCallback, terminate!, get_du, remake
 using OrdinaryDiffEqExponentialRK: ETDRK4
 # using OrdinaryDiffEqTsit5: Tsit5 # temp
 using OrdinaryDiffEqSDIRK: KenCarp3
@@ -62,7 +62,14 @@ function simulate_pseudospectral(model; output_func=tuple, full_solution=false, 
 
         function _output_func(sol,i)
             attempt = sol.prob.p.attempt
-            u,t = transform(sol; full_solution=full_solution)
+            if full_solution
+                u = stack(transform.(sol.u)) # TODO: Avoid unnecessary allocation.
+                t = sol.t
+            else
+                u = transform(sol.u[end])
+                t = sol.t[end]
+            end
+
             if successful_retcode(sol)
                 out = output_func(u, t)
                 repeat = false
@@ -124,6 +131,23 @@ function simulate_mol(model; output_func=tuple, full_solution=false, alg=KenCarp
     end
 end
 
+
+function make_integrator(model; params=parameter_set(model), output_func=tuple, alg=ETDRK4(), num_verts=64, dt=0.1, max_attempts = 4, tol=1e-5, noise=1e-4, kwargs...)
+    make!, transform = pseudospectral_problem(model, num_verts; noise=noise, dt=dt)
+    prob = make!(params)
+    integrator = init(prob, alg; kwargs...)
+    function get_sol(p, t)
+        if p != params
+            params = p
+            make!(integrator, params)
+        end
+        local dt =  max(0.0, t - integrator.t)
+        step!(integrator, t - integrator.t)
+        u = transform(integrator.u)
+        t = integrator.t
+        (u,t)
+    end
+end
 
 
 function steady_state_callback(tol=1e-4)

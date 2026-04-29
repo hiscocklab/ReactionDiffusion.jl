@@ -1,5 +1,5 @@
 module Models
-export Model, species, parameters, reaction_parameters, boundary_parameters, diffusion_parameters,
+export Model, name, species, parameters, reaction_parameters, boundary_parameters, diffusion_parameters,
     num_species, num_params, num_reaction_params, num_diffusion_params,
     domain_size, initial_conditions, noise,
     reaction_rates, diffusion_rates,
@@ -105,15 +105,16 @@ An object containing a mathematical description of a reaction diffusion system t
 
 """
 struct Model
+    name
     reaction
     diffusion
     boundary_flux
     initial_conditions
 end
 
-Model(reaction, diffusion) = Model(reaction, diffusion, (@reaction_network, @reaction_network), SpeciesValues())
-Model(reaction, diffusion, initial::SpeciesValues) = Model(reaction, diffusion, (@reaction_network, @reaction_network), initial)
-Model(reaction, diffusion, boundary::Tuple{ReactionSystem, ReactionSystem}) = Model(reaction, diffusion, boundary, SpeciesValues())
+Model(reaction, diffusion; name="") = Model(name, reaction, diffusion, (@reaction_network, @reaction_network), SpeciesValues())
+Model(reaction, diffusion, initial::SpeciesValues; name="") = Model(name, reaction, diffusion, (@reaction_network, @reaction_network), initial)
+Model(reaction, diffusion, boundary::Tuple{ReactionSystem, ReactionSystem}; name="") = Model(name, reaction, diffusion, boundary, SpeciesValues())
 
 # Don't try to broadcast over a model.
 Base.broadcastable(model::Model) = Ref(model)
@@ -127,6 +128,7 @@ ODESystem(model::Model) = convert(ODESystem, model.reaction)
 #___________________________________________________________________________________________________________________________________________________________________________________
 
 # TODO Eliminate unused getters.
+name(model::Model) = model.name
 species(model::Model) = Catalyst.species(model.reaction)
 parameters(model::Model) = union(reaction_parameters(model), diffusion_parameters(model), initial_condition_parameters(model), boundary_parameters(model))
 
@@ -208,7 +210,7 @@ ParameterSet = Dict{Num, Float64}
 Create a set of parameter values and initial conditions for `model`.
 Defaults are used for values missing from `params`.
 """
-function parameter_set(model, params)
+function parameter_set(model, params=Dict())
     set = ParameterSet()
     
     for rs in reaction_parameters(model)
