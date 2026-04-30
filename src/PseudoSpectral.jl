@@ -69,7 +69,7 @@ function pseudospectral_problem(species, reaction_rates, diffusion_rates, bounda
             p = make_params(params, attempt)
             local u0
             if reset
-                i = Float64[params[k] for k in is]
+                i = Float64[p[k] for k in is]
                 u0 = fu0(i)
                 BC && (u0 .-= p.ϕ)
                 plan * u0

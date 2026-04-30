@@ -84,7 +84,7 @@ function simulate_pseudospectral(model; output_func=tuple, full_solution=false, 
         function prob_func(prob, i, attempt)
             p = params[i]
             dt′ = dt/2^(attempt-1) # halve dt if solve was unsuccessful.
-            prob = make_prob(p, attempt; dt=dt′)
+            prob = make_prob(p; attempt, dt=dt′)
         end
 
         ensemble_prob = EnsembleProblem(make_prob(params[1]); output_func=_output_func, prob_func=prob_func)
@@ -136,16 +136,16 @@ function make_integrator(model; params=parameter_set(model), output_func=tuple, 
     make!, transform = pseudospectral_problem(model, num_verts; noise=noise, dt=dt)
     prob = make!(params)
     integrator = init(prob, alg; kwargs...)
-    function get_sol(p, t)
+    function (p, t)
         if p != params
+            @show "remake"
             params = p
             make!(integrator, params)
         end
-        local dt =  max(0.0, t - integrator.t)
-        step!(integrator, t - integrator.t)
-        u = transform(integrator.u)
-        t = integrator.t
-        (u,t)
+        local dt = t - integrator.t
+        (dt > 0.0)  && step!(integrator, dt)
+        @show integrator.t
+        transform(integrator.sol(t))
     end
 end
 

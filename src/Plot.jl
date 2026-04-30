@@ -71,34 +71,41 @@ Generate an interactive plot of the steady state solution with sliders to adjust
 `param_ranges` should be a dictionary mapping parameter names to either `Range` objects or collections of possible values.
 """
 function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_verts=32, kwargs...)
-	fig = Figure()
+	param_ranges = sort(param_ranges)
+    fig = Figure()
     layout = make_layout(fig)
     ax = Axis(layout.ax, title=name(model), xlabel = "x / L", ylabel = "Concentration")
     hide_y && hideydecorations!(ax)
     param_sliders = make_param_sliders(layout.param_sliders, param_ranges)
     save_button = Button(layout.save_button, label="🖫", font="Segoe UI Symbol")
     annotate_button = Button(layout.annotate_button, label="👁", font="Segoe UI Symbol")
-    t= 0.0:0.1:10.0 # Test value
-    t_slider = SliderGrid(layout.t_slider, (label = "t", range = 0.0:1.0, format = "{:.2f}"))
+    TMAX = Observable(1.0)
+    t_slider_grid = SliderGrid(layout.t_slider, (label = "t", range = @lift(0.0:$TMAX), format = "{:.2f}"))
+    t_slider = t_slider_grid.sliders |> only
     play_button = Button(layout.play_button; label="⏯")
     reset_button = Button(layout.reset_button; label="⏮")
     skip_button = Button(layout.skip_button; label="⏭")
     record_button = Button(layout.record_button; label="⏺", font="Segoe UI Symbol")
     capture_button = Button(layout.capture_button; label="📷", font="Segoe UI Symbol")
 
-    T = only(t_slider.sliders).value
 
 
-    _step! = make_integrator(model; num_verts=num_verts, kwargs...)
-    function f(vals...)
-        params = Dict(k => x isa Int ? v[x] : x for ((k, v), x) in zip(param_ranges, vals))
-        u,t = parameter_set(model, params) |> _step!
+    get_sol! = make_integrator(model; num_verts=num_verts, kwargs...)
+
+    function f(T, P...)
+        params = parameter_set(model, Dict(k => x isa Int ? v[x] : x for ((k, v), x) in zip(param_ranges, P)))
+        u = get_sol!(params, T[])
         r = maximum.(eachcol(u))
         normalise ? u ./ r' : u
     end
+
     
-    U = lift(f, (sl.value for sl in param_sliders.sliders)...)
+    P = (sl.value for sl in param_sliders.sliders)
+    T = t_slider.value
+
+    U = lift(f, T, P...)
     U = throttle(1 / 120, U) # Limit update rate to 120Hz
+
     x = range(0, 1, num_verts)
     labels = [string(s.f) for s in species(model)]
     for i in eachindex(eachcol(U[]))
@@ -112,6 +119,14 @@ function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_
     normalise ? ylims!(ax, -dy, 1 + dy) : nothing
 
     legend = Legend(layout.legend, ax; orientation= :horizontal)
+    tick = @lift($(play_button.clicks) % 2 * $(events(fig).tick).delta_time) 
+    on(events(fig).tick) do tick
+        iseven(play_button.clicks) && return
+        t = T[] + tick.delta_time
+        TMAX[] = max(TMAX[],t)
+        T[] = t
+    end
+
     display(fig)
     fig
 end
@@ -139,7 +154,6 @@ function make_layout(fig)
 end
 
 function make_param_sliders(f, param_ranges)
-    param_ranges = sort(param_ranges)
     slider_specs = [eltype(v) <: AbstractFloat ? (label=string(k), range = v, format = x -> @sprintf("%.2f",x)) : (label=string(k), range = 1:length(v)) for (k,v) in param_ranges]
     SliderGrid(f, slider_specs...)
 end
