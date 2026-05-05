@@ -133,18 +133,18 @@ end
 
 
 function make_integrator(model; params=parameter_set(model), output_func=tuple, alg=ETDRK4(), num_verts=64, dt=0.1, max_attempts = 4, tol=1e-5, noise=1e-4, kwargs...)
-    make!, transform = pseudospectral_problem(model, num_verts; noise=noise, dt=dt)
-    prob = make!(params)
+    make_prob, transform = pseudospectral_problem(model, num_verts; noise=noise, dt=dt)
+    prob = make_prob(params)
     integrator = init(prob, alg; kwargs...)
     function (p, t)
         if p != params
-            @show "remake"
             params = p
-            make!(integrator, params)
+            prob=make_prob(params)
+            integrator = init(prob, alg; kwargs...)
         end
         local dt = t - integrator.t
         (dt > 0.0)  && step!(integrator, dt)
-        @show integrator.t
+
         transform(integrator.sol(t))
     end
 end

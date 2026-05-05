@@ -79,8 +79,8 @@ function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_
     param_sliders = make_param_sliders(layout.param_sliders, param_ranges)
     save_button = Button(layout.save_button, label="🖫", font="Segoe UI Symbol")
     annotate_button = Button(layout.annotate_button, label="👁", font="Segoe UI Symbol")
-    TMAX = Observable(1.0)
-    t_slider_grid = SliderGrid(layout.t_slider, (label = "t", range = @lift(0.0:$TMAX), format = "{:.2f}"))
+    TMAX = Observable(0.0)
+    t_slider_grid = SliderGrid(layout.t_slider, (label = "t", range = @lift(0.0:0.01:$TMAX), format = "{:.2f}"))
     t_slider = t_slider_grid.sliders |> only
     play_button = Button(layout.play_button; label="⏯")
     reset_button = Button(layout.reset_button; label="⏮")
@@ -101,10 +101,11 @@ function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_
 
     
     P = (sl.value for sl in param_sliders.sliders)
-    T = t_slider.value
+    RealT = Observable(0.0)
+    T = throttle(1/120, RealT)
 
     U = lift(f, T, P...)
-    U = throttle(1 / 120, U) # Limit update rate to 120Hz
+    U = throttle(1/120, U) # Limit update rate to 120Hz
 
     x = range(0, 1, num_verts)
     labels = [string(s.f) for s in species(model)]
@@ -119,13 +120,39 @@ function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_
     normalise ? ylims!(ax, -dy, 1 + dy) : nothing
 
     legend = Legend(layout.legend, ax; orientation= :horizontal)
-    tick = @lift($(play_button.clicks) % 2 * $(events(fig).tick).delta_time) 
-    on(events(fig).tick) do tick
-        iseven(play_button.clicks) && return
-        t = T[] + tick.delta_time
-        TMAX[] = max(TMAX[],t)
-        T[] = t
+    
+
+    play = Observable(false)
+
+    on(play_button.clicks) do _
+        play[] = !play[]
     end
+
+
+    on(events(fig).mousebutton) do event
+        (event.action == Mouse.press) || return
+    end
+
+
+    on(t_slider.value) do t
+        play[] || (RealT[] = t)
+    end
+        
+    on(events(fig).tick) do tick
+        if play[]
+            t = RealT[] + tick.delta_time
+            RealT[] = t
+        end
+    end
+
+    on(T) do t
+        if play[]
+            TMAX[] = max(TMAX[],t)
+            t_slider.value = t
+        end
+    end
+ 
+
 
     display(fig)
     fig
