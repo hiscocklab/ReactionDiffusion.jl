@@ -129,30 +129,22 @@ function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_
     end
 
 
-    on(events(fig).mousebutton) do event
-        (event.action == Mouse.press) || return
-    end
-
-
-    on(t_slider.value) do t
-        play[] || (RealT[] = t)
-    end
         
     on(events(fig).tick) do tick
         if play[]
             t = RealT[] + tick.delta_time
             RealT[] = t
+            TMAX[] = max(TMAX[],T[])
+            set_close_to!(t_slider, T[])
         end
     end
 
-    on(T) do t
-        if play[]
-            TMAX[] = max(TMAX[],t)
-            t_slider.value = t
-        end
+    on(t_slider.value) do t
+        isapprox(t, RealT[]; atol=0.02) && return
+        play[]=false
+        RealT[] = t
     end
  
-
 
     display(fig)
     fig
@@ -184,4 +176,5 @@ function make_param_sliders(f, param_ranges)
     slider_specs = [eltype(v) <: AbstractFloat ? (label=string(k), range = v, format = x -> @sprintf("%.2f",x)) : (label=string(k), range = 1:length(v)) for (k,v) in param_ranges]
     SliderGrid(f, slider_specs...)
 end
+
 end
