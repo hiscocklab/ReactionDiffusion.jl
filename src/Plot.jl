@@ -128,21 +128,25 @@ function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_
         play[] = !play[]
     end
 
-
-        
     on(events(fig).tick) do tick
         if play[]
             t = RealT[] + tick.delta_time
             RealT[] = t
             TMAX[] = max(TMAX[],T[])
-            set_close_to!(t_slider, T[])
+            set_close_to!(t_slider, RealT[])
         end
     end
 
     on(t_slider.value) do t
         isapprox(t, RealT[]; atol=0.02) && return
-        play[]=false
+        play[] = false
         RealT[] = t
+    end
+
+    on(reset_button.clicks) do _
+        play[] = false
+        RealT[] = 0
+        set_close_to!(t_slider, RealT[])
     end
  
 
