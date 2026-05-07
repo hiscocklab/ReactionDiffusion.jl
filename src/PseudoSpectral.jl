@@ -5,6 +5,7 @@ using ..Util: collect_variables, safe_stack
 using SciMLBase: SplitODEProblem, ODEProblem, DiagonalOperator, ODEFunction, update_coefficients!, remake
 using FFTW: plan_r2r!, REDFT00, MEASURE
 using Symbolics: @variables, sparsejacobian, build_function, substitute
+using Random:seed!
 
 const x = only(@variables(x))
 
@@ -13,7 +14,7 @@ Construct a SplitODEProblem to solve a reaction diffusion system with reflective
 
 Returns the SplitODEProblem with solutions in the frequency (DCT-1) domain and a FFTW plan to transform solutions back to the spatial domain.
 """
-function pseudospectral_problem(species, reaction_rates, diffusion_rates, boundary_conditions, initial_conditions, num_verts; noise=1e-4, kwargs...)
+function pseudospectral_problem(species, reaction_rates, diffusion_rates, boundary_conditions, initial_conditions, num_verts; noise=1e-4, seed=nothing, kwargs...)
     n = num_verts
     m = length(species)
     
@@ -26,7 +27,11 @@ function pseudospectral_problem(species, reaction_rates, diffusion_rates, bounda
 
     u0 = [substitute(ic, x=>X) for X in range(0,1,n), ic in initial_conditions]
     _fu0,_= build_function(u0, is; expression=Val{false})
-    fu0(i) = _fu0(i) + noise*abs.(randn(n,m))
+
+    seed!(seed)
+    initial_noise = noise * abs.(randn(n,m))
+
+    fu0(i) = _fu0(i) + initial_noise
 
     # Dispatch on `iszero(boundary_conditions)`
     function dispatch_bcs(::Val{BC}) where BC
