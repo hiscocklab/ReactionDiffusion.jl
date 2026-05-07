@@ -1,10 +1,11 @@
 module Simulate
-export simulate, make_integrator
+export simulate, Integrator, step!, step_to!, update_params!, get_u
 
 using ..Models
 using ..PseudoSpectral
 using ..Util: issingle
 using SciMLBase: solve, init, step!, successful_retcode, EnsembleProblem, EnsembleSolution, DiscreteCallback, terminate!, get_du, remake
+using SciMLBase.ReturnCode: Terminated
 using OrdinaryDiffEqExponentialRK: ETDRK4
 # using OrdinaryDiffEqTsit5: Tsit5 # temp
 using OrdinaryDiffEqSDIRK: KenCarp3
@@ -63,10 +64,10 @@ function simulate_pseudospectral(model; output_func=tuple, full_solution=false, 
         function _output_func(sol,i)
             attempt = sol.prob.p.attempt
             if full_solution
-                u = stack(transform.(sol.u)) # TODO: Avoid unnecessary allocation.
+                u = stack(transform(sol)) # TODO: Avoid unnecessary allocation.
                 t = sol.t
             else
-                u = transform(sol.u[end])
+                u = transform(sol, lastindex(sol))
                 t = sol.t[end]
             end
 
@@ -131,22 +132,47 @@ function simulate_mol(model; output_func=tuple, full_solution=false, alg=KenCarp
     end
 end
 
+struct Integrator
+    integrator
+    make_prob
+    transform
+    alg
+    ss = Inf
+end
 
-function make_integrator(model; params=parameter_set(model), output_func=tuple, alg=ETDRK4(), num_verts=64, dt=0.1, max_attempts = 4, tol=1e-5, noise=1e-4, kwargs...)
-    make_prob, transform = pseudospectral_problem(model, num_verts; noise=noise, dt=dt)
+
+
+function Integrator(model; params=parameter_set(model), alg=ETDRK4(), num_verts=64, dt=0.1, noise=1e-4, tol = 1e-5, kwargs...)
+    make_prob, transform = pseudospectral_problem(model, num_verts; noise=noise, dt=dt, callback=steady_state_callback(tol), kwargs...)
     prob = make_prob(params)
-    integrator = init(prob, alg; kwargs...)
-    function (p, t)
-        if p != params
-            params = p
-            prob=make_prob(params)
-            integrator = init(prob, alg; kwargs...)
-        end
-        local dt = t - integrator.t
-        (dt > 0.0)  && step!(integrator, dt)
+    integrator = init(prob, alg)
+    Integrator(integrator,make_prob,transform,alg)
+end
 
-        transform(integrator.sol(t))
+function step!(integrator::Integrator, dt=nothing)
+    step!(integrator.integrator, dt)
+    if integrator.integrator.sol.retcode == Terminated
+        integrator.ss = integrator.integrator.t
     end
+end
+
+function step_to!(integrator::Integrator, t)
+    dt = max(0.0, t - integrator.integrator.t)
+    step!(integrator, dt)
+end
+
+function update_params!(integrator::Integrator, params)
+    prob=integrator.make_prob(params)
+    integrator.integrator = init(prob, alg)
+end
+
+function get_u(integrator::Integrator)
+    integrator.transform(integrator.sol)
+end
+
+function get_u(integrator::Integrator, t)
+    step_to!(integrator,t)
+    integrator.transform(integrator.sol, t)
 end
 
 

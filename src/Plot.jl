@@ -90,22 +90,28 @@ function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_
 
 
 
-    get_sol! = make_integrator(model; num_verts=num_verts, kwargs...)
+    int = Integrator(model; num_verts=num_verts, kwargs...)
+    state = Ref(:stop)
 
-    function f(T, P...)
-        params = parameter_set(model, Dict(k => x isa Int ? v[x] : x for ((k, v), x) in zip(param_ranges, P)))
-        u = get_sol!(params, T[])
+    function f(t)
+        u = get_u(int,t)
         r = maximum.(eachcol(u))
         normalise ? u ./ r' : u
     end
 
     
     P = (sl.value for sl in param_sliders.sliders)
-    RealT = Observable(0.0)
-    T = throttle(1/120, RealT)
+    P = throttle.(1/120, P) 
 
-    U = lift(f, T, P...)
-    U = throttle(1/120, U) # Limit update rate to 120Hz
+    onany(P) do p
+        params = parameter_set(model, Dict(k => x isa Int ? v[x] : x for ((k, v), x) in zip(param_ranges, p)))
+        update_params!(int,params)
+    end
+
+    RealT = Observable(0.0)
+    TT = throttle(1/120, RealT)
+    T = @lift min($TT, int.ss)
+    U = lift(f, T)
 
     x = range(0, 1, num_verts)
     labels = [string(s.f) for s in species(model)]
@@ -122,33 +128,45 @@ function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_
     legend = Legend(layout.legend, ax; orientation= :horizontal)
     
 
-    play = Observable(false)
 
     on(play_button.clicks) do _
-        play[] = !play[]
-    end
-
-    on(events(fig).tick) do tick
-        if play[]
-            t = RealT[] + tick.delta_time
-            RealT[] = t
-            TMAX[] = max(TMAX[],T[])
-            set_close_to!(t_slider, RealT[])
+        if state[] == :stop
+            state[] = :play
+        else
+            state[] = :stop
         end
     end
 
+    on(events(fig).tick) do tick
+        if state[] == :play
+            RealT[] += tick.delta_time
+        elseif state[] == :ff
+            RealT[] += (RealT[] + 1.0)*tick.delta_time
+        end
+    end
+
+    on(T) do t
+        TMAX[] = max(TMAX[],t)
+        set_close_to!(t_slider, t)
+    end
+
     on(t_slider.value) do t
-        isapprox(t, RealT[]; atol=0.02) && return
-        play[] = false
+        # Hack to distinguish user interaction (large movements) from ticks (small movements).
+        # TODO tune this so it works more reliably.
+        isapprox(t, RealT[]; atol=0.02) && return 
+        state[] = :stop
         RealT[] = t
     end
 
     on(reset_button.clicks) do _
-        play[] = false
-        RealT[] = 0
+        state[] = :stop
+        RealT[] = 0.0
         set_close_to!(t_slider, RealT[])
     end
- 
+
+    on(skip_button.clicks) do _
+        state[] = :ff 
+    end
 
     display(fig)
     fig

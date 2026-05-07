@@ -81,12 +81,25 @@ function pseudospectral_problem(species, reaction_rates, diffusion_rates, bounda
         end
 
         # Function to transform output back to spatial domain.
-        function transform(u)
+        # TODO fix code duplication.
+        function transform(sol, t::Float64)
+            u = sol(t)
             u = reshape(u,n,m)
             plan * u
             BC && (u .+= sol.prob.p.ϕ)
             u
         end
+
+        function transform(sol, i::Int)
+            u = sol[i]
+            u = reshape(u,n,m)
+            plan .* u
+            BC && (u .+= sol.prob.p.ϕ)
+            u
+        end
+
+        transform(sol) = transform.(sol, eachindex(sol))
+        
 
         make_problem, transform
     end
