@@ -1,0 +1,6 @@
+[deps]
+OrdinaryDiffEqExponentialRK = "e0540318-69ee-4070-8777-9e2de6de23de"
+PseudoSpectral = "f6475d4d-f43b-4700-b4e1-363d93571312"
+SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
+Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

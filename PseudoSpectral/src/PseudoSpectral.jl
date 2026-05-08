@@ -1,14 +1,15 @@
 module PseudoSpectral
 export pseudospectral_problem, x
 
-using ..Util: collect_variables, safe_stack
 using SciMLBase: SplitODEProblem, ODEProblem, DiagonalOperator, ODEFunction, update_coefficients!, remake
 using FFTW: plan_r2r!, REDFT00, MEASURE
-using Symbolics: @variables, sparsejacobian, build_function, substitute
+using Symbolics: variable, @variables, Num, sparsejacobian, build_function, substitute, get_variables
 using Random:seed!
 
-const x = only(@variables(x))
+const x = variable(:x) |> Num
 
+struct PseudoSpectralProblem
+end
 """
 Construct a SplitODEProblem to solve a reaction diffusion system with reflective boundaries.
 
@@ -90,15 +91,16 @@ function pseudospectral_problem(species, reaction_rates, diffusion_rates, bounda
             u
         end
 
-        function transform(sol, i::Int)
-            u = sol[i]
+        function transform(sol, i::Union{Int,CartesianIndex{1}})
+            @show sol.u
+            u = sol.u[i]
             u = reshape(u,n,m)
             plan .* u
             BC && (u .+= sol.prob.p.ϕ)
             u
         end
 
-        transform(sol) = transform.(sol, eachindex(sol))
+        transform(sol) = [transform(sol, i) for i in eachindex(sol.u)]
         
 
         make_problem, transform
@@ -113,7 +115,7 @@ function reaction_operator(species, reaction_rates, rs, plan!, ::Val{BC}) where 
     @variables u[1:n, 1:m]
     # TODO: Clever things to make only spatially varying parameters expand?
     # Build an nxm matrix of derivatives, substituting reactants for u[i,j] and parameters for p[k,l].
-    du = [substitute(expr, Dict([x=>X, zip(species,v)...])) for (v,X) in zip(eachrow(u), range(0,1,n)), expr in reaction_rates]
+    du = [substitute(expr, Dict([x=>X, zip(species,v)...])) for (v,X) in zip(eachrow(collect(u)), range(0,1,n)), expr in reaction_rates]
     _, f! = build_function(du, u, rs; expression=Val{false})
     
     function f̂!(du,u,p,t)
@@ -154,6 +156,17 @@ struct Parameters
     Δϕ :: Matrix{Float64}
     attempt :: Int64 # Track number of attempts at solution.
 end
+
+## Symbolics utility functions
+"Sort parameters by name."
+sort_variables(p) = sort(p, by=_nameof)
+_nameof(v) = isspecies(v) ? nameof(v.f) : nameof(v)
+
+
+"Extract variables from a (possibly nested) collection of expressions and sort them by name."
+collect_variables(exprs...) = collect_variables(exprs) # Combine multiple arguments.
+collect_variables(exprs::Union{Tuple,Vector}) = exprs .|> collect_variables |> splat(union) |> sort_variables
+collect_variables(expr) = get_variables(expr) |> collect # Call recursively until we get down to a single expression.
 
 end
 

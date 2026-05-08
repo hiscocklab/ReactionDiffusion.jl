@@ -1,8 +1,8 @@
 module Simulate
 export simulate, Integrator, step!, step_to!, update_params!, get_u
 
+using PseudoSpectral
 using ..Models
-using ..PseudoSpectral
 using ..Util: issingle
 using SciMLBase: solve, init, step!, successful_retcode, EnsembleProblem, EnsembleSolution, DiscreteCallback, terminate!, get_du, remake
 using SciMLBase.ReturnCode: Terminated
@@ -133,11 +133,11 @@ function simulate_mol(model; output_func=tuple, full_solution=false, alg=KenCarp
 end
 
 struct Integrator
-    integrator
-    make_prob
-    transform
+    integrator::DEIntegrator
+    make_prob::Function
+    transform::Function
     alg
-    ss = Inf
+    ss::Float64
 end
 
 
@@ -146,7 +146,7 @@ function Integrator(model; params=parameter_set(model), alg=ETDRK4(), num_verts=
     make_prob, transform = pseudospectral_problem(model, num_verts; noise=noise, dt=dt, callback=steady_state_callback(tol), kwargs...)
     prob = make_prob(params)
     integrator = init(prob, alg)
-    Integrator(integrator,make_prob,transform,alg)
+    Integrator(integrator,make_prob,transform,alg,Inf)
 end
 
 function step!(integrator::Integrator, dt=nothing)

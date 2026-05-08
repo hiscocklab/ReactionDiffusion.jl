@@ -1,0 +1,21 @@
+name = "PseudoSpectral"
+uuid = "f6475d4d-f43b-4700-b4e1-363d93571312"
+authors = ["Hugh Coleman <h.coleman.25@abdn.ac.uk>"]
+version = "0.1.0"
+
+[deps]
+FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
+OrdinaryDiffEqExponentialRK = "e0540318-69ee-4070-8777-9e2de6de23de"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
+Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
+
+[compat]
+FFTW = "1.10.0"
+OrdinaryDiffEqExponentialRK = "2.0.0"
+Random = "1.11.0"
+SciMLBase = "3.9.0"
+Symbolics = "7.22.0"
+
+[workspace]
+projects = ["test"]
