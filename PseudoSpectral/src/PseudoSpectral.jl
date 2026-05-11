@@ -17,9 +17,7 @@ struct PseudoSpectralProblem{BC}
     problem::SplitODEProblem
     size::Tuple{Int,Int}
     plan::r2rFFTWPlan
-    fϕ,
-    fΔϕ,
-    ϕ:BC
+    LiftingFunction::LiftingFunction{BC}
 end
 
 struct LiftingFunction{T}
@@ -30,10 +28,13 @@ struct LiftingFunction{T}
 end
 
 LiftingFunction(dims) = LiftingFunction(nothing,nothing,zeros(dims), zeros(dims))
-LiftingFunction(dims    fϕ,  fΔϕ) = LiftingFunction(nothing,nothing,zeros(dims), zeros(dims))
+LiftingFunction(dims, fϕ, fΔϕ) = LiftingFunction(fϕ,fΔϕ,zeros(dims), zeros(dims))
 
-function remake(f::LiftingFunction)
-
+function remake!(f::LiftingFunction{Nothing}, d, b) end
+function remake!(f::LiftingFunction{Function}, d, b)
+    f.ϕ = f.fϕ(b)
+    f.Δϕ = f.fΔϕ(d,b)
+end
 
 struct PseudoSpectralSolution{BC}
     species
@@ -72,17 +73,15 @@ function PseudoSpectralProblem(species, reaction_rates, diffusion_rates, boundar
         Δϕ = ((b-a).*diffusion_rates)' |> collect
         fϕ,_ = build_function(ϕ, bs; expression=Val{false})
         fΔϕ,_ = build_function(Δϕ, ds,bs; expression=Val{false})
+    else
+        fϕ = fΔϕ = nothing
     end
     
     R = reaction_operator(species, reaction_rates, rs, plan, Val(BC))
     D = diffusion_operator(diffusion_rates, ds, n)
     prob = SplitODEProblem(D, R, vec(u), Inf, nothing; kwargs...)
 
-    function make_problem(params; attempt=1, kwargs...)
-        r = Float64[params[k] for k in rs]
-        d = Float64[params[k] for k in ds]
-        b = Float64[params[k] for k in bs]
-        i = Float64[params[k] for k in is]
+
 
         local ϕ, Δϕ
         if BC
@@ -109,28 +108,32 @@ function PseudoSpectralProblem(species, reaction_rates, diffusion_rates, boundar
     PseudoSpectralProblem(prob, plan, !iszero(boundary_conditions))
 end
 
-function remake(prob::PseudoSpectralProblem{BC}; p=nothing, u0=nothing, kwargs...)
+function remake!(prob::PseudoSpectralProblem{BC}; p=nothing, kwargs...)
+    if isnothing(p)
+        prob.prob = remake(prob.prob; kwargs...)
+        return prob
+    end
     r = Float64[params[k] for k in prob.rs]
     d = Float64[params[k] for k in prob.ds]
     b = Float64[params[k] for k in prob.bs]
     i = Float64[params[k] for k in prob.is]
 
-    bc = !isnothing(prob.ϕ)
-    if bc
+    remake!(prob.liftingFunction, b, d)
+
+    w = Matrix{Float64}(undef,n,m) # Allocate working memory for FFTW.
+    p = Parameters(w,r,d,prob.liftingFunction.ϕ,prob.liftingFunction.Δϕ,attempt)
+    u0 = prob.fu0(i)
+    if BC != Nothing 
         ϕ = fϕ(b)
         Δϕ = fΔϕ(d,b)
+        u0 .-= ϕ
     else
-        ϕ = Δϕ = Matrix{Float64}(undef,n,m)
-    end
-    w = Matrix{Float64}(undef,n,m) # Allocate working memory for FFTW.
-    p = Parameters(w,r,d,ϕ,Δϕ,attempt)
-    u0 = prob.fu0(i)
-    bc && (u0 .-= p.ϕ)
-            plan * u0
-            u0 = vec(u0)
-            
-            update_coefficients!(prob.f.f1.f, nothing, p, nothing) # Set parameter values in diffusion operator.
-            remake(prob; p, u0, kwargs...) # Set parameter values in SplitODEProblem.
+        ϕ = 
+    plan * u0
+    u0 = vec(u0)
+    update_coefficients!(prob.prob.f.f1.f, nothing, p, nothing) # Set parameter values in diffusion operator.
+    prob.prob = remake(prob.prob; p, kwargs...) # Set parameter values in SplitODEProblem.
+    prob
 end
 
 function solve(prob::PseudoSpectralProblem, alg; kwargs...)
@@ -195,12 +198,12 @@ function diffusion_operator(diffusion_rates, ps, n)
     DiagonalOperator(λ0; update_func! = update!)
 end
 
-struct Parameters
+struct Parameters{T}
     u :: Matrix{Float64} # Working array for dct.
     r :: Vector{Float64} # Reaction parameters.
     d :: Vector{Float64} # Diffusion parameters.
-    ϕ :: Matrix{Float64} # Boundary lifting function
-    Δϕ :: Matrix{Float64}
+    ϕ :: T # Boundary lifting function
+    Δϕ :: T
     attempt :: Int64 # Track number of attempts at solution.
 end
 
