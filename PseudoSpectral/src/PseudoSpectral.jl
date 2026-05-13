@@ -8,7 +8,7 @@ using Random:seed!
 
 const x = variable(:x) |> Num
 
-struct PseudoSpectralProblem{BC}
+struct PseudoSpectralProblem{T}
     species::Vector{Num},
     reaction_params::Vector{Num},
     diffusion_params::Vector{Num},
@@ -17,21 +17,30 @@ struct PseudoSpectralProblem{BC}
     problem::SplitODEProblem
     size::Tuple{Int,Int}
     plan::r2rFFTWPlan
-    LiftingFunction::LiftingFunction{BC}
+    fϕ::Function,
+    fΔϕ::Function,
 end
 
-struct LiftingFunction{T}
-    fϕ::T,
-    fΔϕ::T,
+struct LiftingFunction
+    fϕ::Function,
+    fΔϕ::Function,
     ϕ::Matrix{Float64}
     Δϕ::Matrix{Float64}
 end
 
-LiftingFunction(dims) = LiftingFunction(nothing,nothing,zeros(dims), zeros(dims))
-LiftingFunction(dims, fϕ, fΔϕ) = LiftingFunction(fϕ,fΔϕ,zeros(dims), zeros(dims))
 
-function remake!(f::LiftingFunction{Nothing}, d, b) end
-function remake!(f::LiftingFunction{Function}, d, b)
+function LiftingFunction(boundary_conditions, diffusion_rates, bs,ds, n)::Union{LiftingFunction, Nothing}
+    iszero(boundary_conditions) && return nothing
+    a,b = eachrow(boundary_conditions)
+    X = range(0.0,1.0,n)
+    ϕ = X.^2 * (b'-a')/2 + X * a'
+    Δϕ = ((b-a).*diffusion_rates)' |> collect
+    fϕ,_ = build_function(ϕ, bs; expression=Val{false})
+    fΔϕ,_ = build_function(Δϕ, ds, bs; expression=Val{false})
+    LiftingFunction(fϕ, fΔϕ, Matrix{undef}(0,0), Matrix{undef}(0,0))
+end
+
+function remake!(f::LiftingFunction, d, b)
     f.ϕ = f.fϕ(b)
     f.Δϕ = f.fΔϕ(d,b)
 end
@@ -66,45 +75,11 @@ function PseudoSpectralProblem(species, reaction_rates, diffusion_rates, boundar
 
     fu0(i) = _fu0(i) + initial_noise
 
-    if !iszero(boundary_conditions)
-        a,b = eachrow(boundary_conditions)
-        X = range(0.0,1.0,n)
-        ϕ = X.^2 * (b'-a')/2 + X * a'
-        Δϕ = ((b-a).*diffusion_rates)' |> collect
-        fϕ,_ = build_function(ϕ, bs; expression=Val{false})
-        fΔϕ,_ = build_function(Δϕ, ds,bs; expression=Val{false})
-    else
-        fϕ = fΔϕ = nothing
-    end
+    lf = iszero(boundary_conditions) ? nothing : LiftingFunction(boundary_conditions, diffusion_rates, bs,ds, n)
     
-    R = reaction_operator(species, reaction_rates, rs, plan, Val(BC))
+    R = reaction_operator(species, reaction_rates, rs, plan, lf)
     D = diffusion_operator(diffusion_rates, ds, n)
     prob = SplitODEProblem(D, R, vec(u), Inf, nothing; kwargs...)
-
-
-
-        local ϕ, Δϕ
-        if BC
-            ϕ = fϕ(b)
-            Δϕ = fΔϕ(d,b)
-        else
-            ϕ = Δϕ = Matrix{Float64}(undef,n,m)
-        end
-
-        w = Matrix{Float64}(undef,n,m) # Allocate working memory for FFTW.
-
-
-        p = Parameters(w,r,d,ϕ,Δϕ,attempt)
-
-        local u0
-        u0 = fu0(i)
-        BC && (u0 .-= p.ϕ)
-        plan * u0
-        u0 = vec(u0)
-        
-        update_coefficients!(prob.f.f1.f, nothing, p, nothing) # Set parameter values in diffusion operator.
-        remake(prob; p, u0, kwargs...) # Set parameter values in SplitODEProblem.
-
     PseudoSpectralProblem(prob, plan, !iszero(boundary_conditions))
 end
 
