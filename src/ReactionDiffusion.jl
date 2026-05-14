@@ -1,6 +1,5 @@
 module ReactionDiffusion
 include("Util.jl")
-include("PseudoSpectral.jl")
 include("Models.jl")
 include("Simulate.jl")
 include("Turing.jl")

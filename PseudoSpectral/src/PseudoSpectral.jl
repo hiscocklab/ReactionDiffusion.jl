@@ -8,28 +8,26 @@ using Random:seed!
 
 const x = variable(:x) |> Num
 
-struct PseudoSpectralProblem{T}
-    species::Vector{Num},
-    reaction_params::Vector{Num},
-    diffusion_params::Vector{Num},
-    boundary_params::Vector{Num},
-    initial_params::Vector{Num},
+ # BC is Nothing for homogeneous for BC or Function for Heterogeneous BC.
+ struct PseudoSpectralProblem
     problem::SplitODEProblem
-    size::Tuple{Int,Int}
+    dims::Tuple{Int,Int}
+    species::Vector{Num}
+    reaction_params::Vector{Num}
+    diffusion_params::Vector{Num}
+    boundary_params::Vector{Num}
+    initial_params::Vector{Num}
     plan::r2rFFTWPlan
-    fϕ::Function,
-    fΔϕ::Function,
+    lifting_function::Union{Nothing, Function}
 end
 
-struct LiftingFunction
-    fϕ::Function,
-    fΔϕ::Function,
-    ϕ::Matrix{Float64}
-    Δϕ::Matrix{Float64}
+struct PseudoSpectralSolution
+    sol::ODESolution
+    species::Vector{Num}
+    plan::r2rFFTWPlan
 end
 
-
-function LiftingFunction(boundary_conditions, diffusion_rates, bs,ds, n)::Union{LiftingFunction, Nothing}
+function make_lifting_function(boundary_conditions, diffusion_rates, boundary_params,diffusion_params, n)
     iszero(boundary_conditions) && return nothing
     a,b = eachrow(boundary_conditions)
     X = range(0.0,1.0,n)
@@ -37,20 +35,21 @@ function LiftingFunction(boundary_conditions, diffusion_rates, bs,ds, n)::Union{
     Δϕ = ((b-a).*diffusion_rates)' |> collect
     fϕ,_ = build_function(ϕ, bs; expression=Val{false})
     fΔϕ,_ = build_function(Δϕ, ds, bs; expression=Val{false})
-    LiftingFunction(fϕ, fΔϕ, Matrix{undef}(0,0), Matrix{undef}(0,0))
+    (d, b) -> (fϕ(b), fΔϕ(d,b))
 end
 
-function remake!(f::LiftingFunction, d, b)
-    f.ϕ = f.fϕ(b)
-    f.Δϕ = f.fΔϕ(d,b)
+function make_initial_function(initial_conditions, initial_params, initial_noise, n; seed=nothing)
+    u0 = [substitute(ic, x=>X) for X in range(0,1,n), ic in initial_conditions]
+    f,_= build_function(u0, initial_params; expression=Val{false})
+    initial_noise = initial_noise * abs.(randn(n,m))
+    function (p)
+        seed!(seed)
+        noise = initial_noise * abs.(randn(n,m))
+        f(p) + noise
+    end
 end
 
-struct PseudoSpectralSolution{BC}
-    species
-    sol::ODESolution
-    plan::r2rFFTWPlan
-    ϕ::BC
-end
+
 """
 Construct a SplitODEProblem to solve a reaction diffusion system with reflective boundaries.
 
@@ -66,24 +65,16 @@ function PseudoSpectralProblem(species, reaction_rates, diffusion_rates, boundar
     u = Matrix{Float64}(undef, n, m)
     plan = 1/sqrt(2*(n-1)) * plan_r2r!(u, REDFT00, 1; flags=MEASURE)
 
-
-    u0 = [substitute(ic, x=>X) for X in range(0,1,n), ic in initial_conditions]
-    _fu0,_= build_function(u0, is; expression=Val{false})
-
-    seed!(seed)
-    initial_noise = noise * abs.(randn(n,m))
-
-    fu0(i) = _fu0(i) + initial_noise
-
-    lf = iszero(boundary_conditions) ? nothing : LiftingFunction(boundary_conditions, diffusion_rates, bs,ds, n)
+    fu0 = make_initial_function(initial_conditions, is, noise, n; seed=seed)
+    lf = make_lifting_functions(boundary_conditions, diffusion_rates, bs,ds, n)
     
-    R = reaction_operator(species, reaction_rates, rs, plan, lf)
+    R = reaction_operator(species, reaction_rates, rs, plan, Val(!isnothing(lf)))
     D = diffusion_operator(diffusion_rates, ds, n)
     prob = SplitODEProblem(D, R, vec(u), Inf, nothing; kwargs...)
-    PseudoSpectralProblem(prob, plan, !iszero(boundary_conditions))
+    PseudoSpectralProblem(prob, (n,m), species, rs, ds, bs, is, plan, lf)
 end
 
-function remake!(prob::PseudoSpectralProblem{BC}; p=nothing, kwargs...)
+function remake!(prob::PseudoSpectralProblem; p=nothing, kwargs...)
     if isnothing(p)
         prob.prob = remake(prob.prob; kwargs...)
         return prob
@@ -93,17 +84,18 @@ function remake!(prob::PseudoSpectralProblem{BC}; p=nothing, kwargs...)
     b = Float64[params[k] for k in prob.bs]
     i = Float64[params[k] for k in prob.is]
 
-    remake!(prob.liftingFunction, b, d)
-
     w = Matrix{Float64}(undef,n,m) # Allocate working memory for FFTW.
-    p = Parameters(w,r,d,prob.liftingFunction.ϕ,prob.liftingFunction.Δϕ,attempt)
     u0 = prob.fu0(i)
-    if BC != Nothing 
-        ϕ = fϕ(b)
-        Δϕ = fΔϕ(d,b)
+    lf = prob.lifting_function
+    if !isnothing(lf)
+        ϕ, Δϕ = lf(d,b)
         u0 .-= ϕ
     else
-        ϕ = 
+        ϕ = Δϕ = Matrix{Float64}(undef,0,0)
+    end
+
+    p = Parameters(w,r,d,ϕ,Δϕ,attempt)
+
     plan * u0
     u0 = vec(u0)
     update_coefficients!(prob.prob.f.f1.f, nothing, p, nothing) # Set parameter values in diffusion operator.
@@ -113,7 +105,7 @@ end
 
 function solve(prob::PseudoSpectralProblem, alg; kwargs...)
     sol = solve(prob, alg; kwargs)
-    PseudoSpectralSolution(sol, prob.plan, prob.ϕ)
+    PseudoSpectralSolution(sol, prob.species, prob.plan)
 end
     
 
@@ -135,7 +127,7 @@ eachindex(sol::PseudoSpectralSolution) = eachindex(sol.sol)
 
 
 "Build function for the reaction component, with `f(v+ϕ) + Δϕ` offset for non-zero-flux BCs."
-function reaction_operator(species, reaction_rates, rs, plan!, ::Val{BC}) where BC
+function reaction_operator(species, reaction_rates, rs, plan!, ::Val{BC})
     n,m = size(plan!)
     @variables u[1:n, 1:m]
     # TODO: Clever things to make only spatially varying parameters expand?
@@ -177,8 +169,8 @@ struct Parameters{T}
     u :: Matrix{Float64} # Working array for dct.
     r :: Vector{Float64} # Reaction parameters.
     d :: Vector{Float64} # Diffusion parameters.
-    ϕ :: T # Boundary lifting function
-    Δϕ :: T
+    ϕ :: Matrix{Float64} # Boundary lifting function
+    Δϕ :: Matrix{Float64}
     attempt :: Int64 # Track number of attempts at solution.
 end
 
