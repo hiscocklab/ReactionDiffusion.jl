@@ -1,30 +1,32 @@
 module PseudoSpectral
 export PseudoSpectralProblem, PseudoSpectralSolution, solve, remake!, x
 
+import SciMLBase
 using SciMLBase: SplitODEProblem, ODEProblem, ODESolution, DiagonalOperator, ODEFunction, update_coefficients!, remake
-using FFTW: plan_r2r!, REDFT00, MEASURE, r2rFFTWPlan
+using FFTW: plan_r2r!, REDFT00, MEASURE, ScaledPlan
 using Symbolics: variable, @variables, Num, sparsejacobian, build_function, substitute, get_variables
 using Random:seed!
 
 const x = variable(:x) |> Num
 
  # BC is Nothing for homogeneous for BC or Function for Heterogeneous BC.
- struct PseudoSpectralProblem
-    problem::ODEProblem
+ mutable struct PseudoSpectralProblem
+    ode_problem::ODEProblem
     dims::Tuple{Int,Int}
     species::Vector{Num}
     reaction_params::Vector{Num}
     diffusion_params::Vector{Num}
     boundary_params::Vector{Num}
     initial_params::Vector{Num}
-    plan #::r2rFFTWPlan
+    plan::ScaledPlan
+    initial_function::Function
     lifting_function::Union{Nothing, Function}
 end
 
 struct PseudoSpectralSolution
     sol::ODESolution
     species::Vector{Num}
-    plan::r2rFFTWPlan
+    plan::ScaledPlan
 end
 
 function make_lifting_function(boundary_conditions, diffusion_rates, boundary_params,diffusion_params, n)
@@ -42,7 +44,6 @@ function make_initial_function(initial_conditions, initial_params, initial_noise
     m = length(initial_conditions)
     u0 = [substitute(ic, x=>X) for X in range(0,1,n), ic in initial_conditions]
     f,_= build_function(u0, initial_params; expression=Val{false})
-    initial_noise = initial_noise * abs.(randn(n,m))
     function (p)
         seed!(seed)
         noise = initial_noise * abs.(randn(n,m))
@@ -56,7 +57,7 @@ Construct a SplitODEProblem to solve a reaction diffusion system with reflective
 
 Returns the SplitODEProblem with solutions in the frequency (DCT-1) domain and a FFTW plan to transform solutions back to the spatial domain.
 """
-function PseudoSpectralProblem(species, reaction_rates, diffusion_rates, boundary_conditions, initial_conditions, num_verts; noise=1e-4, seed=nothing, kwargs...)
+function PseudoSpectralProblem(species, reaction_rates, diffusion_rates, boundary_conditions, initial_conditions, num_verts; p=nothing, noise=1e-4, seed=nothing, kwargs...)
     n = num_verts
     m = length(species)
     
@@ -71,22 +72,23 @@ function PseudoSpectralProblem(species, reaction_rates, diffusion_rates, boundar
     
     R = reaction_operator(species, reaction_rates, rs, plan, Val(!isnothing(lf)))
     D = diffusion_operator(diffusion_rates, ds, n)
-    prob = SplitODEProblem(D, R, vec(u), Inf, nothing; kwargs...)
-    PseudoSpectralProblem(prob, (n,m), species, rs, ds, bs, is, plan, lf)
+    odeprob = SplitODEProblem(D, R, vec(u), Inf, nothing; kwargs...)
+    prob = PseudoSpectralProblem(odeprob, (n,m), species, rs, ds, bs, is, plan, fu0, lf)
+    remake!(prob; p=p)
 end
 
-function remake!(prob::PseudoSpectralProblem; p=nothing, kwargs...)
+function remake!(prob::PseudoSpectralProblem; p=nothing, attempt=1, kwargs...)
     if isnothing(p)
-        prob.prob = remake(prob.prob; kwargs...)
+        prob.ode_problem = remake(prob.ode_problem; kwargs...)
         return prob
     end
-    r = Float64[params[k] for k in prob.rs]
-    d = Float64[params[k] for k in prob.ds]
-    b = Float64[params[k] for k in prob.bs]
-    i = Float64[params[k] for k in prob.is]
+    r = Float64[params[k] for k in prob.reaction_params]
+    d = Float64[params[k] for k in prob.diffusion_params]
+    b = Float64[params[k] for k in prob.boundary_params]
+    i = Float64[params[k] for k in prob.initial_params]
 
-    w = Matrix{Float64}(undef,n,m) # Allocate working memory for FFTW.
-    u0 = prob.fu0(i)
+    w = Matrix{Float64}(undef,prob.dims...) # Allocate working memory for FFTW.
+    u0 = prob.initial_function(i)
     lf = prob.lifting_function
     if !isnothing(lf)
         ϕ, Δϕ = lf(d,b)
@@ -97,15 +99,15 @@ function remake!(prob::PseudoSpectralProblem; p=nothing, kwargs...)
 
     p = Parameters(w,r,d,ϕ,Δϕ,attempt)
 
-    plan * u0
+    prob.plan * u0
     u0 = vec(u0)
-    update_coefficients!(prob.prob.f.f1.f, nothing, p, nothing) # Set parameter values in diffusion operator.
-    prob.prob = remake(prob.prob; p, kwargs...) # Set parameter values in SplitODEProblem.
+    update_coefficients!(prob.ode_problem.f.f1.f, nothing, p, nothing) # Set parameter values in diffusion operator.
+    prob.ode_problem = remake(prob.ode_problem; p, kwargs...) # Set parameter values in SplitODEProblem.
     prob
 end
 
 function solve(prob::PseudoSpectralProblem, alg; kwargs...)
-    sol = solve(prob, alg; kwargs)
+    sol = SciMLBase.solve(prob.ode_problem, alg; kwargs...)
     PseudoSpectralSolution(sol, prob.species, prob.plan)
 end
     
@@ -166,7 +168,7 @@ function diffusion_operator(diffusion_rates, ps, n)
     DiagonalOperator(λ0; update_func! = update!)
 end
 
-struct Parameters{T}
+struct Parameters
     u :: Matrix{Float64} # Working array for dct.
     r :: Vector{Float64} # Reaction parameters.
     d :: Vector{Float64} # Diffusion parameters.

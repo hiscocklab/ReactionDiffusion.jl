@@ -3,7 +3,7 @@ module PseudoSpectralTest
 using PseudoSpectral
 using Symbolics: @variables
 using OrdinaryDiffEqExponentialRK: ETDRK4
-using SciMLBase: solve, successful_retcode
+using SciMLBase: successful_retcode
 using Test
 
 @testset "heat equation" begin
