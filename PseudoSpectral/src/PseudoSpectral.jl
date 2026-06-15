@@ -1,7 +1,7 @@
 module PseudoSpectral
-export pseudospectral_problem, x
+export PseudoSpectralProblem, PseudoSpectralSolution, solve, remake!, x
 
-using SciMLBase: SplitODEProblem, ODEProblem, DiagonalOperator, ODEFunction, update_coefficients!, remake
+using SciMLBase: SplitODEProblem, ODEProblem, ODESolution, DiagonalOperator, ODEFunction, update_coefficients!, remake
 using FFTW: plan_r2r!, REDFT00, MEASURE, r2rFFTWPlan
 using Symbolics: variable, @variables, Num, sparsejacobian, build_function, substitute, get_variables
 using Random:seed!
@@ -10,14 +10,14 @@ const x = variable(:x) |> Num
 
  # BC is Nothing for homogeneous for BC or Function for Heterogeneous BC.
  struct PseudoSpectralProblem
-    problem::SplitODEProblem
+    problem::ODEProblem
     dims::Tuple{Int,Int}
     species::Vector{Num}
     reaction_params::Vector{Num}
     diffusion_params::Vector{Num}
     boundary_params::Vector{Num}
     initial_params::Vector{Num}
-    plan::r2rFFTWPlan
+    plan #::r2rFFTWPlan
     lifting_function::Union{Nothing, Function}
 end
 
@@ -33,12 +33,13 @@ function make_lifting_function(boundary_conditions, diffusion_rates, boundary_pa
     X = range(0.0,1.0,n)
     ϕ = X.^2 * (b'-a')/2 + X * a'
     Δϕ = ((b-a).*diffusion_rates)' |> collect
-    fϕ,_ = build_function(ϕ, bs; expression=Val{false})
-    fΔϕ,_ = build_function(Δϕ, ds, bs; expression=Val{false})
+    fϕ,_ = build_function(ϕ, boundary_params; expression=Val{false})
+    fΔϕ,_ = build_function(Δϕ, diffusion_params, boundary_params; expression=Val{false})
     (d, b) -> (fϕ(b), fΔϕ(d,b))
 end
 
 function make_initial_function(initial_conditions, initial_params, initial_noise, n; seed=nothing)
+    m = length(initial_conditions)
     u0 = [substitute(ic, x=>X) for X in range(0,1,n), ic in initial_conditions]
     f,_= build_function(u0, initial_params; expression=Val{false})
     initial_noise = initial_noise * abs.(randn(n,m))
@@ -66,7 +67,7 @@ function PseudoSpectralProblem(species, reaction_rates, diffusion_rates, boundar
     plan = 1/sqrt(2*(n-1)) * plan_r2r!(u, REDFT00, 1; flags=MEASURE)
 
     fu0 = make_initial_function(initial_conditions, is, noise, n; seed=seed)
-    lf = make_lifting_functions(boundary_conditions, diffusion_rates, bs,ds, n)
+    lf = make_lifting_function(boundary_conditions, diffusion_rates, bs,ds, n)
     
     R = reaction_operator(species, reaction_rates, rs, plan, Val(!isnothing(lf)))
     D = diffusion_operator(diffusion_rates, ds, n)
@@ -127,7 +128,7 @@ eachindex(sol::PseudoSpectralSolution) = eachindex(sol.sol)
 
 
 "Build function for the reaction component, with `f(v+ϕ) + Δϕ` offset for non-zero-flux BCs."
-function reaction_operator(species, reaction_rates, rs, plan!, ::Val{BC})
+function reaction_operator(species, reaction_rates, rs, plan!, ::Val{BC}) where BC
     n,m = size(plan!)
     @variables u[1:n, 1:m]
     # TODO: Clever things to make only spatially varying parameters expand?

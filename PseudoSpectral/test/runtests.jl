@@ -16,8 +16,7 @@ using Test
     @testset "zero flux" begin
         B = [0,0]
         IC = [cos(pi*x)]
-        make_prob,transform = pseudospectral_problem([U], R, D, B, IC, n)
-        prob = make_prob(Dict())
+        prob = PseudoSpectralProblem([U], R, D, B, IC, n)
         sol = solve(prob, ETDRK4(); tspan=(0.0,2.0), dt=dt)
         @test successful_retcode(sol)
         u,t = transform(sol)
@@ -26,8 +25,7 @@ using Test
     @testset "non-zero flux" begin
         B = [pi,pi]
         IC = [pi*x]
-        make_prob,transform = pseudospectral_problem([U], R, D, B, IC, n)
-        prob = make_prob(Dict())
+        prob = PseudoSpectralProblem([U], R, D, B, IC, n)
         sol = solve(prob, ETDRK4(); tspan=(0.0,2.0), dt=dt)
         @test successful_retcode(sol)
         u,t = transform(sol)
@@ -36,8 +34,7 @@ using Test
     @testset "non-negative" begin
         B = [-pi,0] # Inward flux
         IC = [1.0]
-        make_prob,transform = pseudospectral_problem([U], R, D, B, IC, n)
-        prob = make_prob(Dict())
+        prob = PseudoSpectralProblem([U], R, D, B, IC, n)
         sol = solve(prob, ETDRK4(); tspan=(0.0,2.0), dt=dt)
         @test successful_retcode(sol)
         u,t = transform(sol)
