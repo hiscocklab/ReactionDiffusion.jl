@@ -3,7 +3,6 @@ module PseudoSpectralTest
 using PseudoSpectral
 using Symbolics: @variables
 using OrdinaryDiffEqExponentialRK: ETDRK4
-using SciMLBase: successful_retcode
 using Test
 
 @testset "heat equation" begin
@@ -12,15 +11,13 @@ using Test
     D = [1/(pi)^2] # Divide by pi^2 for a domain of size pi.
     n=128
     dt=0.001
-    X = range(0,pi,n)
     @testset "zero flux" begin
         B = [0,0]
         IC = [cos(pi*x)]
         prob = PseudoSpectralProblem([U], R, D, B, IC, n)
         sol = solve(prob, ETDRK4(); tspan=(0.0,2.0), dt=dt)
         @test successful_retcode(sol)
-        u,t = transform(sol)
-        @test u ≈ exp(-t)*cos.(X) rtol=1e-2;
+        @test sol[U][end] ≈ exp(-sol.t[end])*cos.(pi*sol.x) rtol=1e-2;
     end
     @testset "non-zero flux" begin
         B = [pi,pi]
@@ -28,8 +25,7 @@ using Test
         prob = PseudoSpectralProblem([U], R, D, B, IC, n)
         sol = solve(prob, ETDRK4(); tspan=(0.0,2.0), dt=dt)
         @test successful_retcode(sol)
-        u,t = transform(sol)
-        @test u ≈ X rtol=1e-2;
+        @test sol[U][end] ≈ (pi*sol.x) rtol=1e-2;
     end
     @testset "non-negative" begin
         B = [-pi,0] # Inward flux
@@ -37,8 +33,7 @@ using Test
         prob = PseudoSpectralProblem([U], R, D, B, IC, n)
         sol = solve(prob, ETDRK4(); tspan=(0.0,2.0), dt=dt)
         @test successful_retcode(sol)
-        u,t = transform(sol)
-        @test all(>(0), u)
+        @test all(>(0), sol[end])
     end
 end
 
