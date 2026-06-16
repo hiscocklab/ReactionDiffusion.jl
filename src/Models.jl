@@ -8,8 +8,8 @@ export Model, name, species, parameters, reaction_parameters, boundary_parameter
     mol_problem
 
 ## Extended methods
-import ..PseudoSpectral: pseudospectral_problem
-export pseudospectral_problem
+import ..PseudoSpectral: PseudospectralProblem
+export PseudospectralProblem
 
 import ModelingToolkit: ODESystem
 export ODESystem
@@ -249,14 +249,14 @@ Construct a SplitODEProblem to solve a reaction diffusion system with reflective
 
 Returns the SplitODEProblem with solutions in the frequency (DCT-1) domain and a FFTW plan to transform solutions back to the spatial domain.
 """
-function pseudospectral_problem(model, num_verts; kwargs...)
+function PseudospectralProblem(model, num_verts; kwargs...)
     L = domain_size(model)
     S = species(model)
     R = reaction_rates(model)
     D = diffusion_rates(model)/L^2
     B = -L * boundary_flux(model) ./ diffusion_rates(model)'
     I = initial_conditions(model)
-    pseudospectral_problem(S, R, D, B, I, num_verts; kwargs...)
+    PseudospectralProblem(S, R, D, B, I, num_verts; kwargs...)
 end
                               
 function mol_problem(model, num_verts; noise=1e-4, kwargs...)

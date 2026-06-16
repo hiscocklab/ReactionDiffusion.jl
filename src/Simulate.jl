@@ -52,7 +52,7 @@ function simulate(model; discretisation=:pseudospectral, seed=nothing, kwargs...
 end
 
 function simulate_pseudospectral(model; output_func=tuple, full_solution=false, alg=ETDRK4(), num_verts=64, dt=0.1, max_attempts = 4, tol=1e-5, noise=1e-4, kwargs...)
-    make_prob, transform = pseudospectral_problem(model, num_verts; noise=noise)
+    prob = PseudospectralProblem(model, num_verts; noise=noise)
 
     f(params) = f([params]) |> only # Accept a single parameter set instead of a vector.
     f(params::AbstractVector) = f(parameter_set.(model, params))
@@ -85,7 +85,7 @@ function simulate_pseudospectral(model; output_func=tuple, full_solution=false, 
         function prob_func(prob, i, attempt)
             p = params[i]
             dt′ = dt/2^(attempt-1) # halve dt if solve was unsuccessful.
-            prob = make_prob(p; attempt, dt=dt′)
+            prob = remake!(prob; p, attempt, dt=dt′)
         end
 
         ensemble_prob = EnsembleProblem(make_prob(params[1]); output_func=_output_func, prob_func=prob_func)

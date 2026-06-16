@@ -4,6 +4,9 @@ export PseudoSpectralProblem, PseudoSpectralSolution, solve, remake!, x, success
 import Base: getindex, eachindex, lastindex
 export getindex, eachindex, lastindex
 
+import SciMLBase: EnsembleProblem
+export EnsembleProblem
+
 import SciMLBase
 using SciMLBase: SplitODEProblem, ODEProblem, ODESolution, DiagonalOperator, ODEFunction, update_coefficients!, remake, ReturnCode
 using FFTW: plan_r2r!, REDFT00, MEASURE, ScaledPlan
@@ -102,7 +105,12 @@ end
 
 
 function solve(prob::PseudoSpectralProblem, alg; kwargs...)
-    sol = SciMLBase.solve(prob.ode_problem, alg; kwargs...)
+    odesol = SciMLBase.solve(prob.ode_problem, alg; kwargs...)
+    PseudoSpectralSolution(odesol,prob.plan)
+end
+
+# Separate constructor so we can use it both with solve and as an output function for EnsmbleProblem.
+function PseudoSpectralSolution(prob::PseudoSpectralProblem, sol::ODESolution)
     u = map(sol.u) do u
         u = reshape(u, prob.dims)
         prob.plan * u
@@ -192,6 +200,16 @@ eachindex(sol::PseudoSpectralSolution) = eachindex(sol.u)
 lastindex(sol::PseudoSpectralSolution) = lastindex(sol.u)
 
 successful_retcode(sol::PseudoSpectralSolution) = SciMLBase.successful_retcode(sol.retcode)
+
+
+function EnsembleProblem(prob::PseudoSpectralProblem; prob_func, output_func=nothing)
+    _prob_func(prob, i, attempt) = prob_func(prob, i, attempt).ode_problem
+    function _output_func(sol, i) 
+        ps_sol = PseudoSpectralSolution(prob, sol)
+        isnothing(output_func) ?  ps_sol : output_func(ps_sol)
+    end
+    SciMLBase.EnsembleProblem(prob.ode_problem; prob_func=_prob_func, output_func=_output_func)
+end
 
 
 ## Symbolics utility functions
