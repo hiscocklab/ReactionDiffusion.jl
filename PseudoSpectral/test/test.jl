@@ -1,19 +1,21 @@
-
 using PseudoSpectral
 using Symbolics: @variables
 using OrdinaryDiffEqExponentialRK: ETDRK4
 using Test
-##
+
+
 @variables U,g0,g1,d,a,b
 R = [0]
 D = [1/(pi)^2] # Divide by pi^2 for a domain of size pi.
 n=128
 dt=0.001
-X = range(0,pi,n)
+
+@variables D
+d=(1:3)/pi^2  # Divide by pi^2 for a domain of size pi.
 B = [0,0]
 IC = [cos(pi*x)]
-##
-prob = PseudoSpectralProblem([U], R, D, B, IC, n)
-sol = solve(prob, ETDRK4(); tspan=(0.0,2.0), dt=dt)
-@show successful_retcode(sol)
-# @show isapprox(u, exp(-t)*cos.(X); rtol=1e-2)
+prob = PseudoSpectralProblem([U], R, [D], B, IC, n)
+prob_func(prob,i,repeat) = remake(prob; p=Dict(D=>d[i]))
+output_func(sol,i) = sol[U]
+ensembleprob = EnsembleProblem(prob; prob_func=prob_func, output_func)
+sol = solve(ensembleprob, ETDRK4(); tspan=(0.0,2.0), dt=dt, trajectories=length(d))

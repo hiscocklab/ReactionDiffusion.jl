@@ -1,14 +1,14 @@
 module PseudoSpectral
-export PseudoSpectralProblem, PseudoSpectralSolution, solve, remake!, x, successful_retcode
+export PseudoSpectralProblem, PseudoSpectralSolution, x
 
 import Base: getindex, eachindex, lastindex
 export getindex, eachindex, lastindex
 
-import SciMLBase: EnsembleProblem
-export EnsembleProblem
+import SciMLBase: EnsembleProblem, solve, remake, successful_retcode
+export EnsembleProblem, solve, remake, successful_retcode
 
 import SciMLBase
-using SciMLBase: SplitODEProblem, ODEProblem, ODESolution, DiagonalOperator, ODEFunction, update_coefficients!, remake, ReturnCode
+using SciMLBase: SplitODEProblem, ODEProblem, ODESolution, DiagonalOperator, ODEFunction, update_coefficients!, ReturnCode
 using FFTW: plan_r2r!, REDFT00, MEASURE, ScaledPlan
 using Symbolics: variable, @variables, Num, sparsejacobian, build_function, substitute, get_variables
 using Random:seed!
@@ -70,19 +70,19 @@ function PseudoSpectralProblem(species, reaction_rates, diffusion_rates, boundar
     D = diffusion_operator(diffusion_rates, ds, n)
     odeprob = SplitODEProblem(D, R, vec(u), Inf, nothing; kwargs...)
     prob = PseudoSpectralProblem(odeprob, (n,m), species, rs, ds, bs, is, plan, fu0, lf)
-    remake!(prob; p=p)
+    remake(prob; p)
 end
 
 
-function remake!(prob::PseudoSpectralProblem; p=nothing, attempt=1, kwargs...)
+function remake(prob::PseudoSpectralProblem; p=nothing, attempt=1, kwargs...)
     if isnothing(p)
         prob.ode_problem = remake(prob.ode_problem; kwargs...)
         return prob
     end
-    r = Float64[params[k] for k in prob.reaction_params]
-    d = Float64[params[k] for k in prob.diffusion_params]
-    b = Float64[params[k] for k in prob.boundary_params]
-    i = Float64[params[k] for k in prob.initial_params]
+    r = Float64[p[k] for k in prob.reaction_params]
+    d = Float64[p[k] for k in prob.diffusion_params]
+    b = Float64[p[k] for k in prob.boundary_params]
+    i = Float64[p[k] for k in prob.initial_params]
 
     w = Matrix{Float64}(undef,prob.dims...) # Allocate working memory for FFTW.
     u0 = prob.initial_function(i)
@@ -106,7 +106,7 @@ end
 
 function solve(prob::PseudoSpectralProblem, alg; kwargs...)
     odesol = SciMLBase.solve(prob.ode_problem, alg; kwargs...)
-    PseudoSpectralSolution(odesol,prob.plan)
+    PseudoSpectralSolution(prob, odesol)
 end
 
 # Separate constructor so we can use it both with solve and as an output function for EnsmbleProblem.
@@ -203,10 +203,10 @@ successful_retcode(sol::PseudoSpectralSolution) = SciMLBase.successful_retcode(s
 
 
 function EnsembleProblem(prob::PseudoSpectralProblem; prob_func, output_func=nothing)
-    _prob_func(prob, i, attempt) = prob_func(prob, i, attempt).ode_problem
+    _prob_func(_prob, i, attempt) = prob_func(prob, i, attempt).ode_problem
     function _output_func(sol, i) 
         ps_sol = PseudoSpectralSolution(prob, sol)
-        isnothing(output_func) ?  ps_sol : output_func(ps_sol)
+        isnothing(output_func) ?  ps_sol : output_func(ps_sol,i)
     end
     SciMLBase.EnsembleProblem(prob.ode_problem; prob_func=_prob_func, output_func=_output_func)
 end

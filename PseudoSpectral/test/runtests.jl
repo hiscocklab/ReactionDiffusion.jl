@@ -35,6 +35,19 @@ using Test
         @test successful_retcode(sol)
         @test all(>(0), sol[end])
     end
+    @testset "EnsembleProblem" begin
+        @variables D
+        d=(1:3)/pi^2  # Divide by pi^2 for a domain of size pi.
+        B = [0,0]
+        IC = [cos(pi*x)]
+        prob = PseudoSpectralProblem([U], R, [D], B, IC, n)
+        prob_func(prob,i,repeat) = remake(prob; p=Dict(D=>d[i]))
+        output_func(sol,i) = sol[U]
+        ensembleprob = EnsembleProblem(prob; prob_func, output_func)
+        sol = solve(prob, ETDRK4(); tspan=(0.0,2.0), dt=dt)
+        @test successful_retcode(sol)
+        @test sol[end] ≈ exp(-sol.t[end])*cos.(pi*sol.x) rtol=1e-2;
+    end
 end
 
 end;
