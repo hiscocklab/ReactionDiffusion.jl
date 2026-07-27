@@ -11,7 +11,7 @@ import SciMLBase
 using SciMLBase: SplitODEProblem, ODEProblem, ODESolution, DiagonalOperator, ODEFunction, update_coefficients!, ReturnCode
 using FFTW: plan_r2r!, REDFT00, MEASURE, ScaledPlan
 using Symbolics: variable, @variables, Num, sparsejacobian, build_function, substitute, get_variables
-using Random:seed!
+using Random: default_rng
 
 const x = variable(:x) |> Num
 
@@ -52,7 +52,7 @@ Construct a SplitODEProblem to solve a reaction diffusion system with reflective
 
 Returns the SplitODEProblem with solutions in the frequency (DCT-1) domain and a FFTW plan to transform solutions back to the spatial domain.
 """
-function PseudoSpectralProblem(species, reaction_rates, diffusion_rates, boundary_conditions, initial_conditions, num_verts, p=nothing; noise=1e-4, seed=nothing, kwargs...)
+function PseudoSpectralProblem(species, reaction_rates, diffusion_rates, boundary_conditions, initial_conditions, num_verts, p=nothing; noise=1e-4, kwargs...)
     n = num_verts
     m = length(species)
     
@@ -63,7 +63,7 @@ function PseudoSpectralProblem(species, reaction_rates, diffusion_rates, boundar
     u = Matrix{Float64}(undef, n, m)
     plan = 1/sqrt(2*(n-1)) * plan_r2r!(u, REDFT00, 1; flags=MEASURE)
 
-    fu0 = make_initial_function(initial_conditions, is, noise, n; seed=seed)
+    fu0 = make_initial_function(initial_conditions, is, noise, n)
     lf = make_lifting_function(boundary_conditions, diffusion_rates, bs,ds, n)
     
     R = reaction_operator(species, reaction_rates, rs, plan, Val(!isnothing(lf)))
@@ -74,7 +74,7 @@ function PseudoSpectralProblem(species, reaction_rates, diffusion_rates, boundar
 end
 
 
-function remake(prob::PseudoSpectralProblem; p=nothing, attempt=1, kwargs...)
+function remake(prob::PseudoSpectralProblem; p=nothing, rng=default_rng(), attempt=1, kwargs...)
     if isnothing(p)
         prob.ode_problem = remake(prob.ode_problem; kwargs...)
         return prob
@@ -85,7 +85,7 @@ function remake(prob::PseudoSpectralProblem; p=nothing, attempt=1, kwargs...)
     i = Float64[p[k] for k in prob.initial_params]
 
     w = Matrix{Float64}(undef,prob.dims...) # Allocate working memory for FFTW.
-    u0 = prob.initial_function(i)
+    u0 = prob.initial_function(i,rng)
     lf = prob.lifting_function
     if !isnothing(lf)
         ϕ, Δϕ = lf(d,b)
@@ -135,13 +135,12 @@ function make_lifting_function(boundary_conditions, diffusion_rates, boundary_pa
 end
 
 
-function make_initial_function(initial_conditions, initial_params, initial_noise, n; seed=nothing)
+function make_initial_function(initial_conditions, initial_params, initial_noise, n)
     m = length(initial_conditions)
     u0 = [substitute(ic, x=>X) for X in range(0,1,n), ic in initial_conditions]
     f,_= build_function(u0, initial_params; expression=Val{false})
-    function (p)
-        seed!(seed)
-        noise = initial_noise * abs.(randn(n,m))
+    function (p,rng)
+        noise = initial_noise * abs.(randn(rng,n,m))
         f(p) + noise
     end
 end
@@ -201,6 +200,10 @@ lastindex(sol::PseudoSpectralSolution) = lastindex(sol.u)
 
 successful_retcode(sol::PseudoSpectralSolution) = SciMLBase.successful_retcode(sol.retcode)
 
+function EnsembleProblem(prob::PseudoSpectralProblem, params; output_func=nothing)
+    prob_func(_prob,ctx) = remake(_prob; p=params[ctx.sim_id], rng=ctx.rng)
+    EnsembleProblem(prob; prob_func,output_func)
+end
 
 function EnsembleProblem(prob::PseudoSpectralProblem; prob_func, output_func=nothing)
     _prob_func(_prob, ctx) = prob_func(prob, ctx).ode_problem
