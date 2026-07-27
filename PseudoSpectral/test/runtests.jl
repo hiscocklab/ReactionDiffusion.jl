@@ -40,13 +40,14 @@ using Test
         d=(1:3)/pi^2  # Divide by pi^2 for a domain of size pi.
         B = [0,0]
         IC = [cos(pi*x)]
-        prob = PseudoSpectralProblem([U], R, [D], B, IC, n)
-        prob_func(prob,i,repeat) = remake(prob; p=Dict(D=>d[i]))
-        output_func(sol,i) = sol[U]
-        ensembleprob = EnsembleProblem(prob; prob_func, output_func)
-        sol = solve(prob, ETDRK4(); tspan=(0.0,2.0), dt=dt)
-        @test successful_retcode(sol)
-        @test sol[end] ≈ exp(-sol.t[end])*cos.(pi*sol.x) rtol=1e-2;
+        prob = PseudoSpectralProblem([U], R, [D], B, IC, n; noise=0.0)
+        prob_func(prob,ctx) = remake(prob; p=Dict(D=>d[ctx.sim_id]))
+        # output_func(sol,ctx) = sol[U]
+        ensembleprob = EnsembleProblem(prob; prob_func)
+        sol = solve(ensembleprob, ETDRK4(); tspan=(0.0,2.0), dt=dt, trajectories=length(d))
+        sol1=sol.u[1]
+        @test successful_retcode(sol1)
+        @test sol1.u[end] ≈ exp(-sol1.t[end])*cos.(pi*sol1.x) rtol=1e-2;
     end
 end
 

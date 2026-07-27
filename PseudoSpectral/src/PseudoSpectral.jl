@@ -203,10 +203,10 @@ successful_retcode(sol::PseudoSpectralSolution) = SciMLBase.successful_retcode(s
 
 
 function EnsembleProblem(prob::PseudoSpectralProblem; prob_func, output_func=nothing)
-    _prob_func(_prob, i, attempt) = prob_func(prob, i, attempt).ode_problem
-    function _output_func(sol, i) 
+    _prob_func(_prob, ctx) = prob_func(prob, ctx).ode_problem
+    function _output_func(sol, ctx) 
         ps_sol = PseudoSpectralSolution(prob, sol)
-        isnothing(output_func) ?  ps_sol : output_func(ps_sol,i)
+        isnothing(output_func) ?  (ps_sol,false) : output_func(ps_sol,ctx)
     end
     SciMLBase.EnsembleProblem(prob.ode_problem; prob_func=_prob_func, output_func=_output_func)
 end
