@@ -1,14 +1,14 @@
 module PseudoSpectral
-export PseudoSpectralProblem, PseudoSpectralSolution, x
+export PseudoSpectralProblem, PseudoSpectralSolution, steady_state_callback, x
 
 import Base: getindex, eachindex, lastindex
 export getindex, eachindex, lastindex
 
-import SciMLBase: EnsembleProblem, solve, remake, successful_retcode
+import SciMLBase: EnsembleProblem, solve, remake, successful_retcode, DEIntegrator
 export EnsembleProblem, solve, remake, successful_retcode
 
 import SciMLBase
-using SciMLBase: SplitODEProblem, ODEProblem, ODESolution, DiagonalOperator, ODEFunction, update_coefficients!, ReturnCode
+using SciMLBase: SplitODEProblem, ODEProblem, ODESolution, DiagonalOperator, ODEFunction, update_coefficients!, ReturnCode, DiscreteCallback, terminate!, get_du
 using FFTW: plan_r2r!, REDFT00, MEASURE, ScaledPlan
 using Symbolics: variable, @variables, Num, sparsejacobian, build_function, substitute, get_variables
 using Random: default_rng
@@ -43,7 +43,7 @@ struct Parameters
     d :: Vector{Float64} # Diffusion parameters.
     ϕ :: Matrix{Float64} # Boundary lifting function
     Δϕ :: Matrix{Float64}
-    attempt :: Int64 # Track number of attempts at solution.
+    attempt :: Int64 # Track number of attempts at solution. TODO: remove this.
 end
 
 
@@ -95,7 +95,6 @@ function remake(prob::PseudoSpectralProblem; p=nothing, rng=default_rng(), attem
     end
 
     p = Parameters(w,r,d,ϕ,Δϕ,attempt)
-    @show u0
     prob.plan * u0
     u0 = vec(u0)
     update_coefficients!(prob.ode_problem.f.f1.f, nothing, p, nothing) # Set parameter values in diffusion operator.
@@ -128,7 +127,7 @@ function make_lifting_function(boundary_conditions, diffusion_rates, boundary_pa
     a,b = eachrow(boundary_conditions)
     X = range(0.0,1.0,n)
     ϕ = X.^2 * (b'-a')/2 + X * a'
-    Δϕ = ((b-a).*diffusion_rates)' |> collect
+    Δϕ = @show ((b-a).*diffusion_rates)'
     fϕ,_ = build_function(ϕ, boundary_params; expression=Val{false})
     fΔϕ,_ = build_function(Δϕ, diffusion_params, boundary_params; expression=Val{false})
     (d, b) -> (fϕ(b), fΔϕ(d,b))
@@ -178,7 +177,7 @@ function diffusion_operator(diffusion_rates, ps, n)
     # the discrete transform this becomes:
     σ² = @. -(4/h^2) * sin(k*pi/(2*(n-1)))^2
 
-    λ = vec(σ² * diffusion_rates')
+    λ = vec(σ² * diffusion_rates') |> collect
     (f,f!) = build_function(λ, ps; expression=Val{false})
     λ0 = similar(λ, Float64)
     update!(λ,u,p,t) = f!(λ, p.d)
@@ -187,10 +186,12 @@ end
 
 
 function getindex(sol::PseudoSpectralSolution, species::Num)
-    i = findfirst(s -> s===species, sol.species)
-    [u[:,i] for u in sol.u]
+    name=nameof(species)
+    i = findfirst(s -> nameof(s.val.f)===name, sol.species)
+    [vec(u[:,i]) for u in sol.u]
 end
 
+getindex(sol::PseudoSpectralSolution) = getindex(sol.u)
 getindex(sol::PseudoSpectralSolution, i::Union{Int,CartesianIndex{1}}) = sol.u[i]
 
 eachindex(sol::PseudoSpectralSolution) = eachindex(sol.u)
@@ -200,25 +201,61 @@ lastindex(sol::PseudoSpectralSolution) = lastindex(sol.u)
 
 successful_retcode(sol::PseudoSpectralSolution) = SciMLBase.successful_retcode(sol.retcode)
 
-function EnsembleProblem(prob::PseudoSpectralProblem, params; output_func=nothing)
+function EnsembleProblem(prob::PseudoSpectralProblem, params; output_func=nothing, kwargs...)
     prob_func(_prob,ctx) = remake(_prob; p=params[ctx.sim_id], rng=ctx.rng)
-    EnsembleProblem(prob; prob_func,output_func)
+    EnsembleProblem(prob; prob_func,output_func, trajectories=length(params), kwargs...)
 end
 
-function EnsembleProblem(prob::PseudoSpectralProblem; prob_func, output_func=nothing)
+function EnsembleProblem(prob::PseudoSpectralProblem; prob_func, output_func=nothing, kwargs...)
     _prob_func(_prob, ctx) = prob_func(prob, ctx).ode_problem
     function _output_func(sol, ctx) 
         ps_sol = PseudoSpectralSolution(prob, sol)
         isnothing(output_func) ?  (ps_sol,false) : output_func(ps_sol,ctx)
     end
-    SciMLBase.EnsembleProblem(prob.ode_problem; prob_func=_prob_func, output_func=_output_func)
+    SciMLBase.EnsembleProblem(prob.ode_problem; prob_func=_prob_func, output_func=_output_func, kwargs...)
+end
+
+
+## Integrator interface
+struct PseudoSpectralIntegrator
+    integrator::DEIntegrator
+    prob::PseudoSpectralProblem
+    ss::Float64
+end
+
+function PseudoSpectralIntegrator(prob::PseudoSpectralProblem; alg=ETDRK4())
+    integrator=init(prob.ode_problem, alg)
+    PseudoSpectralIntegrator(integrator, prob, Inf)
+end
+
+function step!(integrator::PseudoSpectralIntegrator, dt=nothing)
+    step!(integrator.integrator, dt)
+    if integrator.integrator.sol.retcode == Terminated
+        integrator.ss = integrator.integrator.t
+    end
+end
+
+function step_to!(integrator::PseudoSpectralIntegrator, t)
+    dt = max(0.0, t - integrator.integrator.t)
+    step!(integrator, dt)
+end
+
+function remake(integrator::PseudoSpectralIntegrator; kwargs...)
+    prob = remake(integrator.prob; kwargs...)
+    PseudoSpectralIntegrator(prob)
+end
+
+function steady_state_callback(tol=1e-4)
+    condition(u,t,integrator) = isapprox(get_du(integrator), zero(u); atol=tol)
+    DiscreteCallback(condition, terminate!)
 end
 
 
 ## Symbolics utility functions
 "Sort parameters by name."
 sort_variables(p) = sort(p, by=_nameof)
-_nameof(v) = isspecies(v) ? nameof(v.f) : nameof(v)
+#_nameof(v) = isspecies(v) ? nameof(v.f) : nameof(v)
+_nameof(v) = try nameof(v); catch e nameof(v.f) end # TODO: Something less hacky.
 
 
 "Extract variables from a (possibly nested) collection of expressions and sort them by name."

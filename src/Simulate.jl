@@ -4,8 +4,8 @@ export simulate, Integrator, step!, step_to!, update_params!, get_u
 using PseudoSpectral
 using ..Models
 using ..Util: issingle
-using SciMLBase: solve, init, step!, successful_retcode, EnsembleProblem, EnsembleSolution, DiscreteCallback, terminate!, get_du, remake
-using SciMLBase.ReturnCode: Terminated
+using SciMLBase: solve, init, step!, successful_retcode, EnsembleProblem, EnsembleSolution, get_du, remake
+using SciMLBase.ReturnCode: Terminated, Default
 using OrdinaryDiffEqExponentialRK: ETDRK4
 # using OrdinaryDiffEqTsit5: Tsit5 # temp
 using OrdinaryDiffEqSDIRK: KenCarp3
@@ -51,47 +51,39 @@ function simulate(model; discretisation=:pseudospectral, seed=nothing, kwargs...
     end
 end
 
-function simulate_pseudospectral(model; output_func=tuple, full_solution=false, alg=ETDRK4(), num_verts=64, dt=0.1, max_attempts = 4, tol=1e-5, noise=1e-4, kwargs...)
-    prob = PseudospectralProblem(model, num_verts; noise=noise)
+function simulate_pseudospectral(model; output_func=nothing, alg=ETDRK4(), num_verts=64, dt=0.1, max_attempts = 4, tol=1e-5, noise=1e-4, kwargs...)
+    prob = PseudoSpectralProblem(model, num_verts; noise=noise)
 
-    f(params) = f([params]) |> only # Accept a single parameter set instead of a vector.
+    f(params) = f([params]).u |> only # Accept a single parameter set instead of a vector.
     f(params::AbstractVector) = f(parameter_set.(model, params))
     function f(params::Vector{ParameterSet})
-        isempty(params) && return EnsembleSolution([], 0.0, false) # Handle an empty collection of parameter sets.
-
+        @show params
+        isempty(params) && return PseudoSpectralSolution(species(model),[], [], Default) # Handle an empty collection of parameter sets.
+        
         progress = Progress(length(params); desc="Simulating parameter sets: ", dt=0.1, barglyphs=BarGlyphs("[=> ]"), barlen=50, color=:yellow)
 
-        function _output_func(sol,i)
-            attempt = sol.prob.p.attempt
-            if full_solution
-                u = stack(transform(sol)) # TODO: Avoid unnecessary allocation.
-                t = sol.t
-            else
-                u = transform(sol, lastindex(sol))
-                t = sol.t[end]
-            end
-
+        function _output_func(sol,ctx)
             if successful_retcode(sol)
-                out = output_func(u, t)
+                out = isnothing(output_func) ? sol : output_func(sol)
                 repeat = false
                 next!(progress) # Advance progress bar.
             else
                 out = missing
-                repeat = attempt < max_attempts
+                repeat = ctx.repeat < max_attempts
             end
             (out, repeat)
         end
             
-        function prob_func(prob, i, attempt)
-            p = params[i]
-            dt′ = dt/2^(attempt-1) # halve dt if solve was unsuccessful.
-            prob = remake!(prob; p, attempt, dt=dt′)
+        function prob_func(prob, ctx)
+            p = params[ctx.sim_id]
+            dt′ = dt/2^(ctx.repeat-1) # halve dt if solve was unsuccessful.
+            prob = remake(prob; p, dt=dt′, rng=ctx.rng)
         end
 
-        ensemble_prob = EnsembleProblem(make_prob(params[1]); output_func=_output_func, prob_func=prob_func)
+        ensemble_prob = EnsembleProblem(prob; prob_func, output_func)
         
         with_logger(ConsoleLogger(stderr, Error)) do
-            solve(ensemble_prob, alg; trajectories=length(params), callback=steady_state_callback(tol), verbose=false, kwargs...)
+            solve(ensemble_prob, alg; trajectories=length(params), callback=steady_state_callback(tol), kwargs...)
         end
     end
 end
@@ -130,55 +122,6 @@ function simulate_mol(model; output_func=tuple, full_solution=false, alg=KenCarp
             solve(ensemble_prob, alg; trajectories=length(params), callback=steady_state_callback(tol), verbose=false, maxiters=1e6, kwargs...)
         end
     end
-end
-
-struct Integrator
-    integrator::DEIntegrator
-    make_prob::Function
-    transform::Function
-    alg
-    ss::Float64
-end
-
-
-
-function Integrator(model; params=parameter_set(model), alg=ETDRK4(), num_verts=64, dt=0.1, noise=1e-4, tol = 1e-5, kwargs...)
-    make_prob, transform = pseudospectral_problem(model, num_verts; noise=noise, dt=dt, callback=steady_state_callback(tol), kwargs...)
-    prob = make_prob(params)
-    integrator = init(prob, alg)
-    Integrator(integrator,make_prob,transform,alg,Inf)
-end
-
-function step!(integrator::Integrator, dt=nothing)
-    step!(integrator.integrator, dt)
-    if integrator.integrator.sol.retcode == Terminated
-        integrator.ss = integrator.integrator.t
-    end
-end
-
-function step_to!(integrator::Integrator, t)
-    dt = max(0.0, t - integrator.integrator.t)
-    step!(integrator, dt)
-end
-
-function update_params!(integrator::Integrator, params)
-    prob=integrator.make_prob(params)
-    integrator.integrator = init(prob, alg)
-end
-
-function get_u(integrator::Integrator)
-    integrator.transform(integrator.sol)
-end
-
-function get_u(integrator::Integrator, t)
-    step_to!(integrator,t)
-    integrator.transform(integrator.sol, t)
-end
-
-
-function steady_state_callback(tol=1e-4)
-    condition(u,t,integrator) = isapprox(get_du(integrator), zero(u); atol=tol)
-    DiscreteCallback(condition, terminate!)
 end
 
 end

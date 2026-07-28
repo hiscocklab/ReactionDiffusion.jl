@@ -1,7 +1,7 @@
 name = "ReactionDiffusion"
 uuid = "dcda7c7e-49c0-481c-982d-c35bedad83cd"
-version = "0.2.0"
 authors = ["Tom W. Hiscock", "Hugh Coleman"]
+version = "0.2.0"
 
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
@@ -30,6 +30,9 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 SteadyStateDiffEq = "9672c7b4-1e72-59bd-8a11-6ac3964bc41f"
 Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
+
+[compat]
+Catalyst = "16.2.0"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
