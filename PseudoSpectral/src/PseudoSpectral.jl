@@ -1,5 +1,5 @@
 module PseudoSpectral
-export PseudoSpectralProblem, PseudoSpectralSolution, steady_state_callback, x
+export PseudoSpectralProblem, PseudoSpectralSolution, PseudoSpectralIntegrator, steady_state_callback, x
 
 import Base: getindex, eachindex, lastindex
 export getindex, eachindex, lastindex
@@ -8,7 +8,8 @@ import SciMLBase: EnsembleProblem, solve, remake, successful_retcode, DEIntegrat
 export EnsembleProblem, solve, remake, successful_retcode
 
 import SciMLBase
-using SciMLBase: SplitODEProblem, ODEProblem, ODESolution, DiagonalOperator, ODEFunction, update_coefficients!, ReturnCode, DiscreteCallback, terminate!, get_du
+using SciMLBase: SplitODEProblem, ODEProblem, ODESolution, DiagonalOperator, ODEFunction, update_coefficients!, ReturnCode, DiscreteCallback, terminate!, get_du, init
+using OrdinaryDiffEqExponentialRK: ETDRK4
 using FFTW: plan_r2r!, REDFT00, MEASURE, ScaledPlan
 using Symbolics: variable, @variables, Num, sparsejacobian, build_function, substitute, get_variables
 using Random: default_rng
@@ -93,7 +94,6 @@ function remake(prob::PseudoSpectralProblem; p=nothing, rng=default_rng(), attem
     else
         ϕ = Δϕ = Matrix{Float64}(undef,0,0)
     end
-
     p = Parameters(w,r,d,ϕ,Δϕ,attempt)
     prob.plan * u0
     u0 = vec(u0)
@@ -127,7 +127,7 @@ function make_lifting_function(boundary_conditions, diffusion_rates, boundary_pa
     a,b = eachrow(boundary_conditions)
     X = range(0.0,1.0,n)
     ϕ = X.^2 * (b'-a')/2 + X * a'
-    Δϕ = @show ((b-a).*diffusion_rates)'
+    Δϕ = ((b-a).*diffusion_rates)'
     fϕ,_ = build_function(ϕ, boundary_params; expression=Val{false})
     fΔϕ,_ = build_function(Δϕ, diffusion_params, boundary_params; expression=Val{false})
     (d, b) -> (fϕ(b), fΔϕ(d,b))

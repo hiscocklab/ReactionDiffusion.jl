@@ -1,5 +1,6 @@
 module Plot
 export timeseries_plot, interactive_plot
+using PseudoSpectral
 using ..Simulate
 using ..Models
 using LinearAlgebra: norm
@@ -70,7 +71,7 @@ end
 Generate an interactive plot of the steady state solution with sliders to adjust each of the parameters within `param_ranges`.
 `param_ranges` should be a dictionary mapping parameter names to either `Range` objects or collections of possible values.
 """
-function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_verts=32, kwargs...)
+function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_verts=32, dt=0.1, kwargs...)
 	param_ranges = sort(param_ranges)
     fig = Figure()
     layout = make_layout(fig)
@@ -90,7 +91,6 @@ function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_
 
 
 
-    int = Integrator(model; num_verts=num_verts, kwargs...)
     state = Ref(:stop)
 
     function f(t)
@@ -103,9 +103,13 @@ function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_
     P = (sl.value for sl in param_sliders.sliders)
     P = throttle.(1/120, P) 
 
+    params = @show parameter_set(model, Dict(k => x isa Int ? v[x] : x for ((k, v), x) in zip(param_ranges, [p[] for p in P])))
+    prob = PseudoSpectralProblem(model, num_verts; p=params, dt, kwargs...)
+    int = PseudoSpectralIntegrator(prob)
+
     onany(P) do p
         params = parameter_set(model, Dict(k => x isa Int ? v[x] : x for ((k, v), x) in zip(param_ranges, p)))
-        update_params!(int,params)
+        remake(int,params)
     end
 
     RealT = Observable(0.0)
