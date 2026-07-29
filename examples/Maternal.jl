@@ -61,4 +61,4 @@ param_ranges = dict(
 )
 
 ## Create an interactive plot with sliders to change each parameter.
-interactive_plot(model, param_ranges; dt=0.01)
+fig=interactive_plot(model, param_ranges; dt=0.01, num_verts=8)

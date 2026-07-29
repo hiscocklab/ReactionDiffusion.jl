@@ -8,7 +8,6 @@ using LinearAlgebra: norm
 using Printf: @sprintf
 using Makie
 using Observables
-
 """
     timeseries_plot(model, params; normalise=true, hide_y=true, autolimits=true, kwargs...)
 
@@ -89,23 +88,26 @@ function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_
     record_button = Button(layout.record_button; label="⏺", font="Segoe UI Symbol")
     capture_button = Button(layout.capture_button; label="📷", font="Segoe UI Symbol")
 
-
+    
 
     state = Ref(:stop)
 
     function f(t)
-        u = get_u(int,t)
-        r = maximum.(eachcol(u))
-        normalise ? u ./ r' : u
+        # step_to!(int, t)
+        # u = @show get_sol(int)[end]
+        # r = maximum.(eachcol(u))
+        # @show normalise ? u ./ r' : u
+        rand(num_verts, length(species(model)))
     end
 
     
     P = (sl.value for sl in param_sliders.sliders)
     P = throttle.(1/120, P) 
 
-    params = @show parameter_set(model, Dict(k => x isa Int ? v[x] : x for ((k, v), x) in zip(param_ranges, [p[] for p in P])))
+    params = parameter_set(model, Dict(k => x isa Int ? v[x] : x for ((k, v), x) in zip(param_ranges, [p[] for p in P])))
     prob = PseudoSpectralProblem(model, num_verts; p=params, dt, kwargs...)
     int = PseudoSpectralIntegrator(prob)
+    
 
     onany(P) do p
         params = parameter_set(model, Dict(k => x isa Int ? v[x] : x for ((k, v), x) in zip(param_ranges, p)))
@@ -173,6 +175,7 @@ function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_
     end
 
     display(fig)
+    @show ax.scene.plots
     fig
 end
 

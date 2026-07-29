@@ -1,5 +1,5 @@
 module PseudoSpectral
-export PseudoSpectralProblem, PseudoSpectralSolution, PseudoSpectralIntegrator, steady_state_callback, x
+export PseudoSpectralProblem, PseudoSpectralSolution, PseudoSpectralIntegrator, steady_state_callback, x, step!, step_to!, get_sol
 
 import Base: getindex, eachindex, lastindex
 export getindex, eachindex, lastindex
@@ -9,6 +9,7 @@ export EnsembleProblem, solve, remake, successful_retcode
 
 import SciMLBase
 using SciMLBase: SplitODEProblem, ODEProblem, ODESolution, DiagonalOperator, ODEFunction, update_coefficients!, ReturnCode, DiscreteCallback, terminate!, get_du, init
+using SciMLBase.ReturnCode: Terminated
 using OrdinaryDiffEqExponentialRK: ETDRK4
 using FFTW: plan_r2r!, REDFT00, MEASURE, ScaledPlan
 using Symbolics: variable, @variables, Num, sparsejacobian, build_function, substitute, get_variables
@@ -53,7 +54,7 @@ Construct a SplitODEProblem to solve a reaction diffusion system with reflective
 
 Returns the SplitODEProblem with solutions in the frequency (DCT-1) domain and a FFTW plan to transform solutions back to the spatial domain.
 """
-function PseudoSpectralProblem(species, reaction_rates, diffusion_rates, boundary_conditions, initial_conditions, num_verts, p=nothing; noise=1e-4, kwargs...)
+function PseudoSpectralProblem(species, reaction_rates, diffusion_rates, boundary_conditions, initial_conditions, num_verts; p=nothing, noise=1e-4, kwargs...)
     n = num_verts
     m = length(species)
     
@@ -228,8 +229,10 @@ function PseudoSpectralIntegrator(prob::PseudoSpectralProblem; alg=ETDRK4())
     PseudoSpectralIntegrator(integrator, prob, Inf)
 end
 
-function step!(integrator::PseudoSpectralIntegrator, dt=nothing)
-    step!(integrator.integrator, dt)
+get_sol(integrator::PseudoSpectralIntegrator) = PseudoSpectralSolution(integrator.prob, integrator.integrator.sol)
+
+function step!(integrator::PseudoSpectralIntegrator, dt=nothing, stop_at_tdt=false)
+    SciMLBase.step!(integrator.integrator, dt, stop_at_tdt)
     if integrator.integrator.sol.retcode == Terminated
         integrator.ss = integrator.integrator.t
     end
@@ -237,7 +240,7 @@ end
 
 function step_to!(integrator::PseudoSpectralIntegrator, t)
     dt = max(0.0, t - integrator.integrator.t)
-    step!(integrator, dt)
+    step!(integrator, dt, true)
 end
 
 function remake(integrator::PseudoSpectralIntegrator; kwargs...)
