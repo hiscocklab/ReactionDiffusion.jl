@@ -93,11 +93,9 @@ function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_
     state = Ref(:stop)
 
     function f(t)
-        # step_to!(int, t)
-        # u = @show get_sol(int)[end]
-        # r = maximum.(eachcol(u))
-        # @show normalise ? u ./ r' : u
-        rand(num_verts, length(species(model)))
+        u = get_sol(int)[Int(1 + t ÷ dt)]
+        r = maximum.(eachcol(u))
+        normalise ? u ./ r' : u
     end
 
     
@@ -143,16 +141,21 @@ function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_
         end
     end
 
+
     on(events(fig).tick) do tick
+        print("TICK!")
         if state[] == :play
             RealT[] += tick.delta_time
         elseif state[] == :ff
             RealT[] += (RealT[] + 1.0)*tick.delta_time
         end
+        @show state[]
+        @show RealT[]
     end
 
     on(T) do t
         TMAX[] = max(TMAX[],t)
+        step_to!(int, TMAX[])
         set_close_to!(t_slider, t)
     end
 
@@ -175,7 +178,6 @@ function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_
     end
 
     display(fig)
-    @show ax.scene.plots
     fig
 end
 
