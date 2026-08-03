@@ -1,5 +1,5 @@
 module PseudoSpectral
-export PseudoSpectralProblem, PseudoSpectralSolution, PseudoSpectralIntegrator, steady_state_callback, x, step!, step_to!, get_sol
+export PseudoSpectralProblem, PseudoSpectralSolution, PseudoSpectralIntegrator, steady_state_callback, x, step!, step_to!, get_sol, get_u
 
 import Base: getindex, eachindex, lastindex
 export getindex, eachindex, lastindex
@@ -13,7 +13,7 @@ using SciMLBase.ReturnCode: Terminated
 using OrdinaryDiffEqExponentialRK: ETDRK4
 using FFTW: plan_r2r!, REDFT00, MEASURE, ScaledPlan
 using Symbolics: variable, @variables, Num, sparsejacobian, build_function, substitute, get_variables
-using Random: default_rng
+using Random: default_rng, AbstractRNG
 
 const x = variable(:x) |> Num
 
@@ -29,6 +29,7 @@ const x = variable(:x) |> Num
     plan::ScaledPlan
     initial_function::Function
     lifting_function::Union{Nothing, Function}
+    rng::AbstractRNG
 end
 
 struct PseudoSpectralSolution
@@ -54,7 +55,7 @@ Construct a SplitODEProblem to solve a reaction diffusion system with reflective
 
 Returns the SplitODEProblem with solutions in the frequency (DCT-1) domain and a FFTW plan to transform solutions back to the spatial domain.
 """
-function PseudoSpectralProblem(species, reaction_rates, diffusion_rates, boundary_conditions, initial_conditions, num_verts; p=nothing, noise=1e-4, kwargs...)
+function PseudoSpectralProblem(species, reaction_rates, diffusion_rates, boundary_conditions, initial_conditions, num_verts; p=nothing, noise=1e-4, rng=default_rng(), kwargs...)
     n = num_verts
     m = length(species)
     
@@ -71,15 +72,18 @@ function PseudoSpectralProblem(species, reaction_rates, diffusion_rates, boundar
     R = reaction_operator(species, reaction_rates, rs, plan, Val(!isnothing(lf)))
     D = diffusion_operator(diffusion_rates, ds, n)
     odeprob = SplitODEProblem(D, R, vec(u), Inf, nothing; kwargs...)
-    prob = PseudoSpectralProblem(odeprob, (n,m), species, rs, ds, bs, is, plan, fu0, lf)
+    prob = PseudoSpectralProblem(odeprob, (n,m), species, rs, ds, bs, is, plan, fu0, lf, rng)
     remake(prob; p)
 end
 
 
-function remake(prob::PseudoSpectralProblem; p=nothing, rng=default_rng(), attempt=1, kwargs...)
+function remake(prob::PseudoSpectralProblem; p=nothing, rng=nothing, attempt=1, kwargs...)
     if isnothing(p)
         prob.ode_problem = remake(prob.ode_problem; kwargs...)
         return prob
+    end
+    if !isnothing(rng)
+        prob.rng=rng
     end
     r = Float64[p[k] for k in prob.reaction_params]
     d = Float64[p[k] for k in prob.diffusion_params]
@@ -87,7 +91,7 @@ function remake(prob::PseudoSpectralProblem; p=nothing, rng=default_rng(), attem
     i = Float64[p[k] for k in prob.initial_params]
 
     w = Matrix{Float64}(undef,prob.dims...) # Allocate working memory for FFTW.
-    u0 = prob.initial_function(i,rng)
+    u0 = prob.initial_function(i,prob.rng)
     lf = prob.lifting_function
     if !isnothing(lf)
         ϕ, Δϕ = lf(d,b)
@@ -111,15 +115,17 @@ end
 
 # Separate constructor so we can use it both with solve and as an output function for EnsmbleProblem.
 function PseudoSpectralSolution(prob::PseudoSpectralProblem, sol::ODESolution)
-    u = map(sol.u) do u
-        u = reshape(u, prob.dims)
-        prob.plan * u
-        if !isnothing(prob.lifting_function)
-            u .+= prob.ode_problem.p.ϕ
-        end
-        u
-    end
+    u = transform.(sol.u)
     PseudoSpectralSolution(prob.species, u, range(0.0,1.0,prob.dims[1]), sol.t, sol.retcode)
+end
+
+function transform(prob::PseudoSpectralProblem, u)
+    u = reshape(u, prob.dims)
+    prob.plan * u
+    if !isnothing(prob.lifting_function)
+        u .+= prob.ode_problem.p.ϕ
+    end
+    u
 end
 
 
@@ -218,18 +224,24 @@ end
 
 
 ## Integrator interface
-struct PseudoSpectralIntegrator
+mutable struct PseudoSpectralIntegrator
     integrator::DEIntegrator
     prob::PseudoSpectralProblem
     ss::Float64
 end
 
-function PseudoSpectralIntegrator(prob::PseudoSpectralProblem; alg=ETDRK4())
-    integrator=init(prob.ode_problem, alg)
+function PseudoSpectralIntegrator(prob::PseudoSpectralProblem; alg=ETDRK4(), kwargs...)
+    integrator=init(prob.ode_problem, alg; kwargs...)
     PseudoSpectralIntegrator(integrator, prob, Inf)
 end
 
 get_sol(integrator::PseudoSpectralIntegrator) = PseudoSpectralSolution(integrator.prob, integrator.integrator.sol)
+
+function get_u(integrator::PseudoSpectralIntegrator, t) 
+    step_to!(integrator, t)
+    u = integrator.integrator.sol(t)
+    transform(integrator.prob, u)
+end
 
 function step!(integrator::PseudoSpectralIntegrator, dt=nothing, stop_at_tdt=false)
     SciMLBase.step!(integrator.integrator, dt, stop_at_tdt)
@@ -238,13 +250,14 @@ function step!(integrator::PseudoSpectralIntegrator, dt=nothing, stop_at_tdt=fal
     end
 end
 
-function step_to!(integrator::PseudoSpectralIntegrator, t)
+function step_to!(integrator::PseudoSpectralIntegrator, t, stop_at_tdt=false)
     dt = max(0.0, t - integrator.integrator.t)
-    step!(integrator, dt, true)
+    step!(integrator, dt, stop_at_tdt)
 end
 
 function remake(integrator::PseudoSpectralIntegrator; kwargs...)
     prob = remake(integrator.prob; kwargs...)
+    @show kwargs
     PseudoSpectralIntegrator(prob)
 end
 

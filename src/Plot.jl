@@ -8,6 +8,7 @@ using LinearAlgebra: norm
 using Printf: @sprintf
 using Makie
 using Observables
+using Random: Xoshiro, seed!
 """
     timeseries_plot(model, params; normalise=true, hide_y=true, autolimits=true, kwargs...)
 
@@ -70,7 +71,7 @@ end
 Generate an interactive plot of the steady state solution with sliders to adjust each of the parameters within `param_ranges`.
 `param_ranges` should be a dictionary mapping parameter names to either `Range` objects or collections of possible values.
 """
-function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_verts=32, dt=0.1, kwargs...)
+function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_verts=32, dt=0.1, seed=123, kwargs...)
 	param_ranges = sort(param_ranges)
     fig = Figure()
     layout = make_layout(fig)
@@ -93,28 +94,34 @@ function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_
     state = Ref(:stop)
 
     function f(t)
-        u = get_sol(int)[Int(1 + t ÷ dt)]
+        # step_to!(int, t)
+        # sol = get_sol(int)
+        # i = findfirst(>=(t), sol.t)
+        u = get_u(int[],t)
         r = maximum.(eachcol(u))
         normalise ? u ./ r' : u
     end
 
     
-    P = (sl.value for sl in param_sliders.sliders)
-    P = throttle.(1/120, P) 
+    P = (throttle(1/120,sl.value) for sl in param_sliders.sliders)
 
     params = parameter_set(model, Dict(k => x isa Int ? v[x] : x for ((k, v), x) in zip(param_ranges, [p[] for p in P])))
-    prob = PseudoSpectralProblem(model, num_verts; p=params, dt, kwargs...)
-    int = PseudoSpectralIntegrator(prob)
+    rng=Xoshiro(seed)
+    prob = PseudoSpectralProblem(model, num_verts; p=params, dt, rng, kwargs...)
+    int = Ref(PseudoSpectralIntegrator(prob, callback=steady_state_callback()))
     
 
-    onany(P) do p
+    onany(P...) do p...
+        @show p
         params = parameter_set(model, Dict(k => x isa Int ? v[x] : x for ((k, v), x) in zip(param_ranges, p)))
-        remake(int,params)
+        rng = seed!(rng,seed)
+        int[] = remake(int[]; p=params, rng)
+        U[]=f(T[])
     end
 
     RealT = Observable(0.0)
     TT = throttle(1/120, RealT)
-    T = @lift min($TT, int.ss)
+    T = @lift min($TT, int[].ss)
     U = lift(f, T)
 
     x = range(0, 1, num_verts)
@@ -143,26 +150,22 @@ function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_
 
 
     on(events(fig).tick) do tick
-        print("TICK!")
         if state[] == :play
             RealT[] += tick.delta_time
         elseif state[] == :ff
             RealT[] += (RealT[] + 1.0)*tick.delta_time
         end
-        @show state[]
-        @show RealT[]
     end
 
     on(T) do t
         TMAX[] = max(TMAX[],t)
-        step_to!(int, TMAX[])
         set_close_to!(t_slider, t)
     end
 
     on(t_slider.value) do t
         # Hack to distinguish user interaction (large movements) from ticks (small movements).
         # TODO tune this so it works more reliably.
-        isapprox(t, RealT[]; atol=0.02) && return 
+        isapprox(t, RealT[]; atol=0.05) && return 
         state[] = :stop
         RealT[] = t
     end

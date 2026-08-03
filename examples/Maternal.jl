@@ -60,5 +60,7 @@ param_ranges = dict(
     D_hb = range(0.1, 2.0, 50)
 )
 
-## Create an interactive plot with sliders to change each parameter.
-fig=interactive_plot(model, param_ranges; dt=0.01, num_verts=8)
+
+
+
+fig=interactive_plot(model, param_ranges; dt=0.001, num_verts=32)
