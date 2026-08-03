@@ -1,7 +1,7 @@
 name = "ReactionDiffusion"
 uuid = "dcda7c7e-49c0-481c-982d-c35bedad83cd"
-version = "0.2.0"
 authors = ["Tom W. Hiscock", "Hugh Coleman"]
+version = "0.2.0"
 
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
@@ -15,6 +15,7 @@ Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 MethodOfLines = "94925ecb-adb7-4558-8ed8-f975c56a0bf4"
 ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
+NativeFileDialog = "e1fe445b-aa65-4df4-81c1-2041507f0fd4"
 Observables = "510215fc-4207-5dde-b226-833fc4488ee2"
 Optim = "429524aa-4258-5aef-a3af-852621145aeb"
 OrdinaryDiffEqExponentialRK = "e0540318-69ee-4070-8777-9e2de6de23de"
@@ -33,6 +34,7 @@ WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 
 [compat]
 Catalyst = "16.2.0"
+NativeFileDialog = "0.2.1"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

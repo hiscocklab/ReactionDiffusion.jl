@@ -9,6 +9,7 @@ using Printf: @sprintf
 using Makie
 using Observables
 using Random: Xoshiro, seed!
+using NativeFileDialog: save_file
 """
     timeseries_plot(model, params; normalise=true, hide_y=true, autolimits=true, kwargs...)
 
@@ -186,6 +187,15 @@ function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_
         end 
     end
 
+    on(capture_button.clicks) do _
+        filename = NativeFileDialog.save_file(pwd(); filterlist = "png;svg;pdf"
+    )
+        save(layout.ax)
+    end
+    on(record_button.clicks) do _
+    end
+    on(save_button.clicks) do _
+    end
     display(fig)
     fig
 end
