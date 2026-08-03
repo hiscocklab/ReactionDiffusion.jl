@@ -7,6 +7,8 @@ using LinearAlgebra: norm
 
 using Printf: @sprintf
 using Makie
+using Makie: COLOR_ACCENT
+using CairoMakie
 using Observables
 using Random: Xoshiro, seed!
 using NativeFileDialog: save_file
@@ -72,27 +74,28 @@ end
 Generate an interactive plot of the steady state solution with sliders to adjust each of the parameters within `param_ranges`.
 `param_ranges` should be a dictionary mapping parameter names to either `Range` objects or collections of possible values.
 """
-function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_verts=32, dt=0.1, seed=123, kwargs...)
+function interactive_plot(model, param_ranges; normalise=false, hide_y=false, num_verts=32, dt=0.01, seed=123, kwargs...)
 	param_ranges = sort(param_ranges)
     fig = Figure()
     layout = make_layout(fig)
-    ax = Axis(layout.ax, title=name(model), xlabel = "x / L", ylabel = "Concentration")
+    ax = Axis(layout.ax, title=name(model), xlabel = "x / L", ylabel = "Concentration", yticklabelspace = 50.0)
     hide_y && hideydecorations!(ax)
-    param_sliders = make_param_sliders(layout.param_sliders, param_ranges)
-    save_button = Button(layout.save_button, label="🖫", font="Segoe UI Symbol")
-    annotate_button = Button(layout.annotate_button, label="👁", font="Segoe UI Symbol")
+    param_sliders = make_param_sliders(layout.param_sliders, param_ranges; width=300)
     TMAX = Observable(0.0)
+    state = Observable(:stop)
+    recording = Observable(false)
+
     t_slider_grid = SliderGrid(layout.t_slider, (label = "t", range = @lift(0.0:0.01:$TMAX), format = "{:.2f}"))
     t_slider = t_slider_grid.sliders |> only
-    play_button = Button(layout.play_button; label="⏯")
+    play_button = Button(layout.play_button; label=@lift(if $state==:stop "▶" else "⏸" end), font="Segoe UI Symbol")
     reset_button = Button(layout.reset_button; label="⏮")
-    skip_button = Button(layout.skip_button; label="⏭")
-    record_button = Button(layout.record_button; label="⏺", font="Segoe UI Symbol")
+    skip_button = Button(layout.skip_button; label="⏭", buttoncolor=@lift(if $state==:ff COLOR_ACCENT[] else RGBf(0.94, 0.94, 0.94) end))
+    record_button = Button(layout.record_button; label="⏺", buttoncolor=@lift(if $recording COLOR_ACCENT[] else RGBf(0.94, 0.94, 0.94) end), font="Segoe UI Symbol")
     capture_button = Button(layout.capture_button; label="📷", font="Segoe UI Symbol")
 
     
 
-    state = Ref(:stop)
+    
 
     function f(t)
         # step_to!(int, t)
@@ -140,6 +143,7 @@ function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_
     
 
 
+
     on(play_button.clicks) do _
         if state[] == :stop
             state[] = :play
@@ -155,10 +159,18 @@ function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_
         elseif state[] == :ff
             RealT[] += (RealT[] + 1.0)*tick.delta_time
         end
+        if isassigned(video)
+            recordframe!(video[])
+        end
     end
 
     on(T) do t
-        TMAX[] = min(max(TMAX[],t), int[].ss)
+        ss = int[].ss
+        if t >= ss
+            t = ss
+            state[]= :stop
+        end
+        TMAX[] = max(TMAX[],t)
         set_close_to!(t_slider, t)
     end
 
@@ -188,14 +200,39 @@ function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_
     end
 
     on(capture_button.clicks) do _
-        filename = NativeFileDialog.save_file(pwd(); filterlist = "png;svg;pdf"
-    )
-        save(layout.ax)
+        filename = save_file(pwd(); filterlist = "png;svg;pdf")
+        isempty(filename) && return
+        export_fig = Figure()
+        export_ax = Axis(export_fig[1, 1]; title=ax.title[], xlabel=ax.xlabel[], ylabel=ax.ylabel[])
+        for i in eachindex(eachcol(U[]))
+            lines!(export_ax, x, U[][:, i]; label=labels[i])
+        end
+        save(filename, export_fig; backend=CairoMakie)
+        nothing
     end
+
+    video = Ref{VideoStream}()
+ 
     on(record_button.clicks) do _
+        if recording[]
+            filename = save_file(pwd(); filterlist = "mkv;mp4;webm;gif")
+            if !isempty(filename)
+                save(filename, video[])
+            end
+            video = Ref{VideoStream}()
+            recording[]=false
+            return
+        end
+        export_fig = Figure()
+        export_ax = Axis(export_fig[1, 1]; title=ax.title[], xlabel=ax.xlabel[], ylabel=ax.ylabel[])
+        for i in eachindex(eachcol(U[]))
+            lines!(export_ax, x, lift(u -> u[:, i], U); label=labels[i])
+        end
+
+        video[] = VideoStream(export_fig; backend=CairoMakie)
+        recording[]=true
     end
-    on(save_button.clicks) do _
-    end
+
     display(fig)
     fig
 end
@@ -206,9 +243,6 @@ function make_layout(fig)
             ax = plot_pane[1,1]
             legend_bar = plot_pane[2,1]
                 legend = legend_bar[1,1]
-                param_buttons = legend_bar[1,2]
-                    save_button = param_buttons[1,1]
-                    annotate_button = param_buttons[1,2]
         param_sliders = body[1,2]
     control_bar = fig[2,1]
         t_slider = control_bar[1,1]
@@ -218,13 +252,13 @@ function make_layout(fig)
             skip_button = control_buttons[1,3]
             record_button = control_buttons[1,4]
             capture_button = control_buttons[1,5]
-    (;ax, legend, save_button, annotate_button, param_sliders, t_slider,
+    (;ax, legend, param_sliders, t_slider,
         play_button, reset_button, skip_button, record_button, capture_button)
 end
 
-function make_param_sliders(f, param_ranges)
+function make_param_sliders(f, param_ranges; width=nothing)
     slider_specs = [eltype(v) <: AbstractFloat ? (label=string(k), range = v, format = x -> @sprintf("%.2f",x)) : (label=string(k), range = 1:length(v)) for (k,v) in param_ranges]
-    SliderGrid(f, slider_specs...)
+    SliderGrid(f, slider_specs...; width=width)
 end
 
 end
