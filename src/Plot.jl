@@ -112,7 +112,6 @@ function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_
     
 
     onany(P...) do p...
-        @show p
         params = parameter_set(model, Dict(k => x isa Int ? v[x] : x for ((k, v), x) in zip(param_ranges, p)))
         rng = seed!(rng,seed)
         int[] = remake(int[]; p=params, rng)
@@ -158,7 +157,7 @@ function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_
     end
 
     on(T) do t
-        TMAX[] = max(TMAX[],t)
+        TMAX[] = min(max(TMAX[],t), int[].ss)
         set_close_to!(t_slider, t)
     end
 
@@ -177,7 +176,14 @@ function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_
     end
 
     on(skip_button.clicks) do _
-        state[] = :ff 
+        ss= int[].ss
+        if ss < Inf
+            state[] = :stop
+            RealT[] = ss
+            set_close_to!(t_slider, RealT[])
+        else
+            state[] = :ff
+        end 
     end
 
     display(fig)

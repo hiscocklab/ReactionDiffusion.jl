@@ -63,4 +63,4 @@ param_ranges = dict(
 
 
 
-fig=interactive_plot(model, param_ranges; dt=0.001, num_verts=32)
+fig=interactive_plot(model, param_ranges; dt=0.01, num_verts=32)

@@ -257,7 +257,6 @@ end
 
 function remake(integrator::PseudoSpectralIntegrator; kwargs...)
     prob = remake(integrator.prob; kwargs...)
-    @show kwargs
     PseudoSpectralIntegrator(prob)
 end
 
