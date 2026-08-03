@@ -1,10 +1,9 @@
 module ReactionDiffusion
 include("Util.jl")
-include("PseudoSpectral.jl")
 include("Models.jl")
 include("Simulate.jl")
 include("Turing.jl")
-include("Optimise.jl")
+# include("Optimise.jl")
 include("Plot.jl")
 
 using Reexport
@@ -13,7 +12,7 @@ using Reexport
 @reexport using .Turing
 @reexport using .Util: dict, product
 @reexport using Catalyst: @reaction_network
-@reexport using .Optimise
+# @reexport using .Optimise
 @reexport using .Plot
 
 end

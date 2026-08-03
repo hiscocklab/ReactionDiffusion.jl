@@ -39,3 +39,4 @@
 # Misc
 
 - Use `getname` instead of `nameof`.
+- Use NullParameters

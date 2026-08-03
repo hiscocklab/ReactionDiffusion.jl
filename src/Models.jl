@@ -1,5 +1,5 @@
 module Models
-export Model, species, parameters, reaction_parameters, boundary_parameters, diffusion_parameters,
+export Model, name, species, parameters, reaction_parameters, boundary_parameters, diffusion_parameters,
     num_species, num_params, num_reaction_params, num_diffusion_params,
     domain_size, initial_conditions, noise,
     reaction_rates, diffusion_rates,
@@ -8,8 +8,8 @@ export Model, species, parameters, reaction_parameters, boundary_parameters, dif
     mol_problem
 
 ## Extended methods
-import ..PseudoSpectral: pseudospectral_problem
-export pseudospectral_problem
+import PseudoSpectral: PseudoSpectralProblem
+export PseudoSpectralProblem
 
 import ModelingToolkit: ODESystem
 export ODESystem
@@ -74,7 +74,7 @@ function diffusion_system(L, body, source)
     rexpr = dict_expr(pairs)
     L = parse_expr!(parameters, L)
     forbidden_symbol_check(parameters)
-    psexpr = get_psexpr(parameters, Dict{Symbol, Expr}()) # @parameters
+    psexpr = get_psexpr(parameters, [], Dict{Symbol, Expr}()) # @parameters
     iv = :($(DEFAULT_IV_SYM) = default_t()) # t
     sexpr = get_usexpr(species, Dict{Symbol, Expr}()) # @species
     dsexpr = :(DiffusionSystem($L, $rexpr))
@@ -105,16 +105,17 @@ An object containing a mathematical description of a reaction diffusion system t
 
 """
 struct Model
+    name
     reaction
     diffusion
     boundary_flux
     initial_conditions
 end
 
-Model(reaction, diffusion) = Model(reaction, diffusion, (@reaction_network, @reaction_network), SpeciesValues())
-Model(reaction, diffusion, initial::SpeciesValues) = Model(reaction, diffusion, (@reaction_network, @reaction_network), initial)
-Model(reaction, diffusion, boundary::Tuple{ReactionSystem, ReactionSystem}) = Model(reaction, diffusion, boundary, SpeciesValues())
-
+Model(reaction, diffusion; name="") = Model(name, reaction, diffusion, (@reaction_network, @reaction_network), SpeciesValues())
+Model(reaction, diffusion, initial::SpeciesValues; name="") = Model(name, reaction, diffusion, (@reaction_network, @reaction_network), initial)
+Model(reaction, diffusion, boundary::Tuple{ReactionSystem, ReactionSystem}; name="") = Model(name, reaction, diffusion, boundary, SpeciesValues())
+Model(reaction, diffusion, boundary::Tuple{ReactionSystem, ReactionSystem}, initial::SpeciesValues; name="") = Model(name, reaction, diffusion, boundary, initial)
 # Don't try to broadcast over a model.
 Base.broadcastable(model::Model) = Ref(model)
 
@@ -127,6 +128,7 @@ ODESystem(model::Model) = convert(ODESystem, model.reaction)
 #___________________________________________________________________________________________________________________________________________________________________________________
 
 # TODO Eliminate unused getters.
+name(model::Model) = model.name
 species(model::Model) = Catalyst.species(model.reaction)
 parameters(model::Model) = union(reaction_parameters(model), diffusion_parameters(model), initial_condition_parameters(model), boundary_parameters(model))
 
@@ -142,7 +144,7 @@ initial_conditions(model::Model, default=0.0) = [get(model.initial_conditions, s
 function boundary_flux(model::Model)
     b0, b1 = model.boundary_flux
     s = species(model)
-    vcat(assemble_oderhs(b0, s)', assemble_oderhs(b1, s)')
+    vcat(assemble_oderhs(b0, s)', assemble_oderhs(b1, s)') .|> Num
 end
 
 num_species(model::Model) = numspecies(model.reaction)
@@ -186,7 +188,7 @@ end
 macro initial_conditions(body)
     species, parameters, pairs = parse_body(body, __source__)
     icexpr = dict_expr(pairs)
-    psexpr = get_psexpr(parameters, Dict{Symbol, Expr}()) # @parameters
+    psexpr = get_psexpr(parameters, [], Dict{Symbol, Expr}()) # @parameters
     iv = :($(DEFAULT_IV_SYM) = default_t()) # t
     sexpr = get_usexpr(species, Dict{Symbol, Expr}()) # @species
     quote
@@ -208,7 +210,7 @@ ParameterSet = Dict{Num, Float64}
 Create a set of parameter values and initial conditions for `model`.
 Defaults are used for values missing from `params`.
 """
-function parameter_set(model, params)
+function parameter_set(model, params=Dict())
     set = ParameterSet()
     
     for rs in reaction_parameters(model)
@@ -247,14 +249,14 @@ Construct a SplitODEProblem to solve a reaction diffusion system with reflective
 
 Returns the SplitODEProblem with solutions in the frequency (DCT-1) domain and a FFTW plan to transform solutions back to the spatial domain.
 """
-function pseudospectral_problem(model, num_verts; kwargs...)
+function PseudoSpectralProblem(model, num_verts; kwargs...)
     L = domain_size(model)
     S = species(model)
     R = reaction_rates(model)
     D = diffusion_rates(model)/L^2
     B = -L * boundary_flux(model) ./ diffusion_rates(model)'
     I = initial_conditions(model)
-    pseudospectral_problem(S, R, D, B, I, num_verts; kwargs...)
+    PseudoSpectralProblem(S, R, D, B, I, num_verts; kwargs...)
 end
                               
 function mol_problem(model, num_verts; noise=1e-4, kwargs...)

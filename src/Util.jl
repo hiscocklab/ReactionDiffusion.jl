@@ -28,19 +28,6 @@ zip_dict(keys, values) = Dict(zip(keys,values))
 unzip_dict(dict) = (collect(keys(dict)), collect(values(dict)))
 
 
-
-## Symbolics 
-"Sort parameters by name."
-sort_variables(p) = sort(p, by=_nameof)
-_nameof(v) = isspecies(v) ? nameof(v.f) : nameof(v)
-
-
-"Extract variables from a (possibly nested) collection of expressions and sort them by name."
-collect_variables(exprs...) = collect_variables(exprs) # Combine multiple arguments.
-collect_variables(exprs::Union{Tuple,Vector}) = @pipe exprs .|> collect_variables |> splat(union) |> sort_variables
-collect_variables(expr) = get_variables(expr) # Call recursively until we get down to a single expression.
-
-
 ## Subscripted symbols
 "Map integers to subscript characters."
 sub(i) = join(Char(0x2080 + d) for d in reverse!(digits(i)))

@@ -1,13 +1,17 @@
 module Plot
 export timeseries_plot, interactive_plot
+using PseudoSpectral
 using ..Simulate
 using ..Models
 using LinearAlgebra: norm
 
 using Printf: @sprintf
 using Makie
+using Makie: COLOR_ACCENT
+using CairoMakie
 using Observables
-
+using Random: Xoshiro, seed!
+using NativeFileDialog: save_file
 """
     timeseries_plot(model, params; normalise=true, hide_y=true, autolimits=true, kwargs...)
 
@@ -70,27 +74,59 @@ end
 Generate an interactive plot of the steady state solution with sliders to adjust each of the parameters within `param_ranges`.
 `param_ranges` should be a dictionary mapping parameter names to either `Range` objects or collections of possible values.
 """
-function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_verts=32, kwargs...)
+function interactive_plot(model, param_ranges; normalise=false, hide_y=false, num_verts=32, dt=0.01, seed=123, kwargs...)
+	param_ranges = sort(param_ranges)
+    fig = Figure()
+    layout = make_layout(fig)
+    ax = Axis(layout.ax, title=name(model), xlabel = "x / L", ylabel = "Concentration", yticklabelspace = 50.0)
+    hide_y && hideydecorations!(ax)
+    param_sliders = make_param_sliders(layout.param_sliders, param_ranges; width=300)
+    TMAX = Observable(0.0)
+    state = Observable(:stop)
+    recording = Observable(false)
 
-    simulate_ = simulate(model; num_verts=num_verts, kwargs...)
-    function f(vals...)
-        params = Dict(k => x isa Int ? v[x] : x for ((k, v), x) in zip(param_ranges, vals))
-        u,t = parameter_set(model, params) |> simulate_
+    t_slider_grid = SliderGrid(layout.t_slider, (label = "t", range = @lift(0.0:0.01:$TMAX), format = "{:.2f}"))
+    t_slider = t_slider_grid.sliders |> only
+    play_button = Button(layout.play_button; label=@lift(if $state==:stop "▶" else "⏸" end), font="Segoe UI Symbol")
+    reset_button = Button(layout.reset_button; label="⏮")
+    skip_button = Button(layout.skip_button; label="⏭", buttoncolor=@lift(if $state==:ff COLOR_ACCENT[] else RGBf(0.94, 0.94, 0.94) end))
+    record_button = Button(layout.record_button; label="⏺", buttoncolor=@lift(if $recording COLOR_ACCENT[] else RGBf(0.94, 0.94, 0.94) end), font="Segoe UI Symbol")
+    capture_button = Button(layout.capture_button; label="📷", font="Segoe UI Symbol")
+
+    
+
+    
+
+    function f(t)
+        # step_to!(int, t)
+        # sol = get_sol(int)
+        # i = findfirst(>=(t), sol.t)
+        u = get_u(int[],t)
         r = maximum.(eachcol(u))
         normalise ? u ./ r' : u
     end
+
     
-	fig = Figure()
-	ax = Axis(fig[1,1], xlabel = "x / L", ylabel = "Concentration") # TODO have axis labels passed in as kwargs
-	hide_y && hideydecorations!(ax)
+    P = (throttle(1/120,sl.value) for sl in param_sliders.sliders)
 
-    param_ranges = sort(param_ranges)
-    slider_specs = [eltype(v) <: AbstractFloat ? (label=string(k), range = v, format = x -> @sprintf("%.2f",x)) : (label=string(k), range = 1:length(v)) for (k,v) in param_ranges]
+    params = parameter_set(model, Dict(k => x isa Int ? v[x] : x for ((k, v), x) in zip(param_ranges, [p[] for p in P])))
+    rng=Xoshiro(seed)
+    prob = PseudoSpectralProblem(model, num_verts; p=params, dt, rng, kwargs...)
+    int = Ref(PseudoSpectralIntegrator(prob, callback=steady_state_callback()))
+    
 
-    sg = SliderGrid(fig[1,2], slider_specs...)
+    onany(P...) do p...
+        params = parameter_set(model, Dict(k => x isa Int ? v[x] : x for ((k, v), x) in zip(param_ranges, p)))
+        rng = seed!(rng,seed)
+        int[] = remake(int[]; p=params, rng)
+        U[]=f(T[])
+    end
 
-    U = lift(f, (sl.value for sl in sg.sliders)...)
-    U = throttle(1 / 120, U) # Limit update rate to 120Hz
+    RealT = Observable(0.0)
+    TT = throttle(1/120, RealT)
+    T = @lift min($TT, int[].ss)
+    U = lift(f, T)
+
     x = range(0, 1, num_verts)
     labels = [string(s.f) for s in species(model)]
     for i in eachindex(eachcol(U[]))
@@ -103,8 +139,126 @@ function interactive_plot(model, param_ranges; normalise=true, hide_y=true, num_
     dy = 0.05 # padding of the plot in y
     normalise ? ylims!(ax, -dy, 1 + dy) : nothing
 
-    axislegend(ax)
+    legend = Legend(layout.legend, ax; orientation= :horizontal)
+    
+
+
+
+    on(play_button.clicks) do _
+        if state[] == :stop
+            state[] = :play
+        else
+            state[] = :stop
+        end
+    end
+
+
+    on(events(fig).tick) do tick
+        if state[] == :play
+            RealT[] += tick.delta_time
+        elseif state[] == :ff
+            RealT[] += (RealT[] + 1.0)*tick.delta_time
+        end
+        if isassigned(video)
+            recordframe!(video[])
+        end
+    end
+
+    on(T) do t
+        ss = int[].ss
+        if t >= ss
+            t = ss
+            state[]= :stop
+        end
+        TMAX[] = max(TMAX[],t)
+        set_close_to!(t_slider, t)
+    end
+
+    on(t_slider.value) do t
+        # Hack to distinguish user interaction (large movements) from ticks (small movements).
+        # TODO tune this so it works more reliably.
+        isapprox(t, RealT[]; atol=0.05) && return 
+        state[] = :stop
+        RealT[] = t
+    end
+
+    on(reset_button.clicks) do _
+        state[] = :stop
+        RealT[] = 0.0
+        set_close_to!(t_slider, RealT[])
+    end
+
+    on(skip_button.clicks) do _
+        ss= int[].ss
+        if ss < Inf
+            state[] = :stop
+            RealT[] = ss
+            set_close_to!(t_slider, RealT[])
+        else
+            state[] = :ff
+        end 
+    end
+
+    on(capture_button.clicks) do _
+        filename = save_file(pwd(); filterlist = "png;svg;pdf")
+        isempty(filename) && return
+        export_fig = Figure()
+        export_ax = Axis(export_fig[1, 1]; title=ax.title[], xlabel=ax.xlabel[], ylabel=ax.ylabel[])
+        for i in eachindex(eachcol(U[]))
+            lines!(export_ax, x, U[][:, i]; label=labels[i])
+        end
+        save(filename, export_fig; backend=CairoMakie)
+        nothing
+    end
+
+    video = Ref{VideoStream}()
+ 
+    on(record_button.clicks) do _
+        if recording[]
+            filename = save_file(pwd(); filterlist = "mkv;mp4;webm;gif")
+            if !isempty(filename)
+                save(filename, video[])
+            end
+            video = Ref{VideoStream}()
+            recording[]=false
+            return
+        end
+        export_fig = Figure()
+        export_ax = Axis(export_fig[1, 1]; title=ax.title[], xlabel=ax.xlabel[], ylabel=ax.ylabel[])
+        for i in eachindex(eachcol(U[]))
+            lines!(export_ax, x, lift(u -> u[:, i], U); label=labels[i])
+        end
+
+        video[] = VideoStream(export_fig; backend=CairoMakie)
+        recording[]=true
+    end
+
     display(fig)
     fig
 end
+
+function make_layout(fig)
+    body = fig[1,1]
+        plot_pane = body[1,1]
+            ax = plot_pane[1,1]
+            legend_bar = plot_pane[2,1]
+                legend = legend_bar[1,1]
+        param_sliders = body[1,2]
+    control_bar = fig[2,1]
+        t_slider = control_bar[1,1]
+        control_buttons = control_bar[1,2]
+            play_button = control_buttons[1,1]
+            reset_button = control_buttons[1,2]
+            skip_button = control_buttons[1,3]
+            record_button = control_buttons[1,4]
+            capture_button = control_buttons[1,5]
+    (;ax, legend, param_sliders, t_slider,
+        play_button, reset_button, skip_button, record_button, capture_button)
+end
+
+function make_param_sliders(f, param_ranges; width=nothing)
+    slider_specs = [eltype(v) <: AbstractFloat ? (label=string(k), range = v, format = x -> @sprintf("%.2f",x)) : (label=string(k), range = 1:length(v)) for (k,v) in param_ranges]
+    SliderGrid(f, slider_specs...; width=width)
+end
+
 end
