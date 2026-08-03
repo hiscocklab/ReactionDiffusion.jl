@@ -115,7 +115,7 @@ end
 
 # Separate constructor so we can use it both with solve and as an output function for EnsmbleProblem.
 function PseudoSpectralSolution(prob::PseudoSpectralProblem, sol::ODESolution)
-    u = transform.(sol.u)
+    u = [transform(prob, u) for u in sol.u]
     PseudoSpectralSolution(prob.species, u, range(0.0,1.0,prob.dims[1]), sol.t, sol.retcode)
 end
 
