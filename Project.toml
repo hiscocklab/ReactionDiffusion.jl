@@ -1,6 +1,6 @@
 name = "ReactionDiffusion"
 uuid = "dcda7c7e-49c0-481c-982d-c35bedad83cd"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Tom W. Hiscock", "Hugh Coleman"]
 
 [workspace]
