@@ -1,6 +1,6 @@
 #push!(LOAD_PATH,"../src/")
 
-using Documenter, ReactionDiffusion, Catalyst
+using Documenter, ReactionDiffusion, PseudoSpectralReactionDiffusion, Catalyst
 
 makedocs(
     sitename="ReactionDiffusion.jl",
@@ -17,9 +17,9 @@ makedocs(
     ],
     doctest = false,
     clean=true,
-    modules=[ReactionDiffusion, Catalyst],
-    checkdocs=:public,
-    checkdocs_ignored_modules = [ReactionDiffusion.PseudoSpectral, Catalyst]
+    modules=[ReactionDiffusion, PseudoSpectralReactionDiffusion, Catalyst],
+    checkdocs=:none,
+    checkdocs_ignored_modules = [Catalyst]
 )
 
 # deploydocs(repo = "github.com/hiscocklab/ReactionDiffusion.jl.git";

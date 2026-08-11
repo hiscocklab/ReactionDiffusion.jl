@@ -8,7 +8,7 @@ export Model, name, species, parameters, reaction_parameters, boundary_parameter
     mol_problem
 
 ## Extended methods
-import PseudoSpectral: PseudoSpectralProblem
+import PseudoSpectralReactionDiffusion: PseudoSpectralProblem
 export PseudoSpectralProblem
 
 import ModelingToolkit: ODESystem

@@ -1,11 +1,11 @@
 module Simulate
-export simulate, Integrator, step!, step_to!, update_params!, get_u
+export simulate
 
-using PseudoSpectral
+using PseudoSpectralReactionDiffusion
 using ..Models
 using ..Util: issingle
-using SciMLBase: solve, init, step!, successful_retcode, EnsembleProblem, EnsembleSolution, get_du, remake
-using SciMLBase.ReturnCode: Terminated, Default
+import SciMLBase
+using SciMLBase.ReturnCode: Default
 using OrdinaryDiffEqExponentialRK: ETDRK4
 # using OrdinaryDiffEqTsit5: Tsit5 # temp
 using OrdinaryDiffEqSDIRK: KenCarp3
@@ -96,7 +96,7 @@ function simulate_mol(model; output_func=tuple, full_solution=false, alg=KenCarp
     f(params) = f([params]) |> only # Accept a single parameter set instead of a vector.
     f(params::AbstractVector) = f(parameter_set.(model, params))
     function f(params::Vector{ParameterSet})
-        isempty(params) && return EnsembleSolution([], 0.0, false) # Handle an empty collection of parameter sets.
+        isempty(params) && return SciML.EnsembleSolution([], 0.0, false) # Handle an empty collection of parameter sets.
 
         progress = Progress(length(params); desc="Simulating parameter sets: ", dt=0.1, barglyphs=BarGlyphs("[=> ]"), barlen=50, color=:yellow)
         function _output_func(sol,i)
@@ -115,11 +115,11 @@ function simulate_mol(model; output_func=tuple, full_solution=false, alg=KenCarp
             (out, false)
         end
         
-        prob_func(prob, i, attempt) = remake(prob; p=params[i])
-        ensemble_prob = EnsembleProblem(prob; output_func=_output_func, prob_func=prob_func)
+        prob_func(prob, i, attempt) = SciML.remake(prob; p=params[i])
+        ensemble_prob = SciML.EnsembleProblem(prob; output_func=_output_func, prob_func=prob_func)
         
         with_logger(ConsoleLogger(stderr, Error)) do
-            solve(ensemble_prob, alg; trajectories=length(params), callback=steady_state_callback(tol), verbose=false, maxiters=1e6, kwargs...)
+            SciML.solve(ensemble_prob, alg; trajectories=length(params), callback=steady_state_callback(tol), verbose=false, maxiters=1e6, kwargs...)
         end
     end
 end

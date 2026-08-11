@@ -8,7 +8,7 @@ timeseries_plot(model,params)
 ```
 Use the slider to view the solution at different points in time.
 
-For a fully interactive simulation, use the `interactive_plot` tool. This will allow you to adjust parameters and view the resulting steady-state solution in real time.
+For a fully interactive simulation, use the `interactive_plot` tool. This will allow you to adjust parameters and view the resulting solution in real time.
 
 ```julia
 param_ranges = dict(

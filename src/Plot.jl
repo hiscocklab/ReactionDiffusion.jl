@@ -1,6 +1,6 @@
 module Plot
 export timeseries_plot, interactive_plot
-using PseudoSpectral
+using PseudoSpectralReactionDiffusion
 using ..Simulate
 using ..Models
 using LinearAlgebra: norm
