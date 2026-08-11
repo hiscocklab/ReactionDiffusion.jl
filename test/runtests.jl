@@ -3,7 +3,8 @@ module ReactionDiffusionTest
 using ReactionDiffusion
 using Test
 include("../examples/Schnakenberg.jl")
-using .Schnakenberg: U
+
+U = Schnakenberg.model.reaction.U
 
 
 function num_periods(u)

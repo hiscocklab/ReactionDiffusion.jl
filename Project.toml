@@ -3,6 +3,9 @@ uuid = "dcda7c7e-49c0-481c-982d-c35bedad83cd"
 version = "0.2.0"
 authors = ["Tom W. Hiscock", "Hugh Coleman"]
 
+[workspace]
+projects = ["test", "docs"]
+
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
@@ -21,7 +24,7 @@ OrdinaryDiffEqSDIRK = "2d112036-d095-4a1e-ab9a-08536f3ecdbf"
 Pipe = "b98c9c47-44ae-5843-9183-064241ee97a0"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
-PseudoSpectral = "f6475d4d-f43b-4700-b4e1-363d93571312"
+PseudoSpectralReactionDiffusion = "f6475d4d-f43b-4700-b4e1-363d93571312"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
@@ -34,9 +37,4 @@ WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 CairoMakie = "0.15.13"
 Catalyst = "16.2.0"
 NativeFileDialog = "0.2.1"
-
-[extras]
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-
-[targets]
-test = ["Test"]
+PseudoSpectralReactionDiffusion = "0.1.0"

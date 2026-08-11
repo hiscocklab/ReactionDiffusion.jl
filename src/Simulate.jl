@@ -1,7 +1,7 @@
 module Simulate
 export simulate, Integrator, step!, step_to!, update_params!, get_u
 
-using PseudoSpectral
+using PseudoSpectralReactionDiffusion
 using ..Models
 using ..Util: issingle
 using SciMLBase: solve, init, step!, successful_retcode, EnsembleProblem, EnsembleSolution, get_du, remake

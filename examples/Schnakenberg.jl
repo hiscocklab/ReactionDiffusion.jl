@@ -2,8 +2,7 @@
 
 module Schnakenberg
 using ReactionDiffusion
-using Catalyst
-@species U,V
+
 reaction = @reaction_network begin
     γ*a + γ*U^2*V,  ∅ --> U
     γ,              U --> ∅
