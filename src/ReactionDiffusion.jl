@@ -14,5 +14,5 @@ using Reexport
 @reexport using Catalyst: @reaction_network
 # @reexport using .Optimise
 @reexport using .Plot
-
+@reexport using PseudoSpectralReactionDiffusion
 end

@@ -13,17 +13,27 @@ If you require more customization or a more flexible PDE-solving framework, we h
 Model
 @reaction_network
 @diffusion_system
+@initial_conditions
 parameter_set
 simulate
-PsuedoSpectralProblem
-PseudoSpectralSolution
-EnsembleProblem
-solve
 turing_wavelength
 is_turing
 filter_turing
 timeseries_plot
 interactive_plot
+
+PseudoSpectralProblem
+PseudoSpectralSolution
+EnsembleProblem
+steady_state_callback
+solve
+init
+remake
+get_u
+get_sol
+step!
+step_to!
+x
 ```
 
 

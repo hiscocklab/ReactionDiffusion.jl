@@ -1,10 +1,10 @@
 module Simulate
-export simulate, Integrator, step!, step_to!, update_params!, get_u
+export simulate
 
 using PseudoSpectralReactionDiffusion
 using ..Models
 using ..Util: issingle
-using SciMLBase: solve, init, step!, successful_retcode, EnsembleProblem, EnsembleSolution, get_du, remake
+using SciMLBase: solve, init, successful_retcode, EnsembleProblem, EnsembleSolution, get_du, remake
 using SciMLBase.ReturnCode: Terminated, Default
 using OrdinaryDiffEqExponentialRK: ETDRK4
 # using OrdinaryDiffEqTsit5: Tsit5 # temp
