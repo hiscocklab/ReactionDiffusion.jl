@@ -112,7 +112,7 @@ function interactive_plot(model, param_ranges; normalise=false, hide_y=false, nu
     params = parameter_set(model, Dict(k => x isa Int ? v[x] : x for ((k, v), x) in zip(param_ranges, [p[] for p in P])))
     rng=Xoshiro(seed)
     prob = PseudoSpectralProblem(model, num_verts; p=params, dt, rng, kwargs...)
-    int = Ref(PseudoSpectralIntegrator(prob, callback=steady_state_callback()))
+    int = Ref(init(prob, callback=steady_state_callback()))
     
 
     onany(P...) do p...
