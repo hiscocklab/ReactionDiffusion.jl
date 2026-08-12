@@ -44,6 +44,16 @@ end
     @test num_periods(u) ≈ expected_periods rtol=0.1
 end
 
+@testset "ensemble" begin
+    model = Schnakenberg.model
+    params = product(a = range(0.2,0.21,10), b = 2.0, γ = 1.0, Dᵤ = 1.0, Dᵥ = 50.0, L=100.0, U0=1.0,V0=1.0)
+    sols = simulate(model, params).u
+    for (sol,p) in zip(sols, params)
+        u = sol[U][end]
+        @test num_periods(u) ≈ 1/turing_wavelength(model,p) rtol=0.1
+    end
+end
+
 # @testset "MOL" begin
 #     model = Schnakenberg.model
 #     params = dict(a = 0.2, b = 2.0, γ = 1.0, Dᵤ = 1.0, Dᵥ = 50.0, L=100.0)

@@ -1,4 +1,3 @@
-module BMP
 using ReactionDiffusion
 
 reaction = @reaction_network begin
@@ -16,12 +15,13 @@ reaction = @reaction_network begin
 end
 
 diffusion = @diffusion_system L begin
-    D_GDF5,     GDF5
-    D_NOG,      NOG
-    D_COMPLEX,  COMPLEX
+    D₁,     GDF5
+    D₂,      NOG
+    D₃,  COMPLEX
 end
 
-model = Model(reaction, diffusion)
+
+model = Model(reaction, diffusion, initial)
 
 params = (
     :μ₁ => 1.0,
@@ -40,4 +40,5 @@ params = (
     :D₂ => 1.0,
     :D₃ => 30.0
 )
-end
+
+interactive_plot(model, params; dt=0.001, num_verts=256)
