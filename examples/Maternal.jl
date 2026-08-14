@@ -7,13 +7,15 @@ posterior = >(11/12)
 
 ## Define a reaction network.
 reaction = @reaction_network begin
-    anterior(x) * μ_bcd,           ∅ --> BCD # Bicoid expression in anterior region
-    posterior(x) * μ_nos,          ∅ --> NOS  # Nanos expression in posterior region
     δ_bcd,                      BCD --> ∅   # Bicod degredation
     δ_nos,                      NOS --> ∅ # Nanos degredation
     hillar(BCD, NOS, μ_hb,K,n), ∅ --> HB  # Hunchback expression. Hill function with BCD activating and NOS inhibiting.
     δ_hb,                       HB --> ∅ # Hunchback degredation 
 end
+
+b0 = @reaction_network begin μ_bcd, ∅ --> BCD end # Bicoid expression at anterior.
+b1 = @reaction_network begin μ_nos, ∅ --> NOS end  # Nanos expression at posterior.
+boundary = (b0,b1)
 
 ## Define a system of diffusing species on a 1D domain of size `L`.
 diffusion = @diffusion_system L begin
@@ -23,7 +25,7 @@ diffusion = @diffusion_system L begin
 end
 
 ## Combine `reaction` and `diffusion` into a single `Model` object.
-model = Model(reaction, diffusion; name="Maternal Gradients")
+model = Model(reaction, diffusion, boundary; name="Maternal Gradients")
 
 ## Pick some parameter sets to test.
 params = dict(
