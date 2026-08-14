@@ -144,7 +144,7 @@ initial_conditions(model::Model, default=0.0) = [get(model.initial_conditions, s
 function boundary_flux(model::Model)
     b0, b1 = model.boundary_flux
     s = species(model)
-    vcat(assemble_oderhs(b0, s)', assemble_oderhs(b1, s)') .|> Num
+    vcat(assemble_oderhs(b0, s)', -assemble_oderhs(b1, s)') .|> Num
 end
 
 num_species(model::Model) = numspecies(model.reaction)
