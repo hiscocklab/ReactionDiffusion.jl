@@ -57,7 +57,6 @@ function simulate_pseudospectral(model; output_func=nothing, alg=ETDRK4(), num_v
     f(params) = f([params]).u |> only # Accept a single parameter set instead of a vector.
     f(params::AbstractVector) = f(parameter_set.(model, params))
     function f(params::Vector{ParameterSet})
-        @show params
         isempty(params) && return PseudoSpectralSolution(species(model),[], [], Default) # Handle an empty collection of parameter sets.
         
         progress = Progress(length(params); desc="Simulating parameter sets: ", dt=0.1, barglyphs=BarGlyphs("[=> ]"), barlen=50, color=:yellow)
@@ -74,13 +73,13 @@ function simulate_pseudospectral(model; output_func=nothing, alg=ETDRK4(), num_v
             (out, repeat)
         end
             
-        function prob_func(prob, ctx)
+        function _prob_func(prob, ctx)
             p = params[ctx.sim_id]
             dt′ = dt/2^(ctx.repeat-1) # halve dt if solve was unsuccessful.
             prob = remake(prob; p, dt=dt′, rng=ctx.rng)
         end
 
-        ensemble_prob = EnsembleProblem(prob; prob_func, output_func)
+        ensemble_prob = EnsembleProblem(prob; _prob_func, _output_func)
         
         with_logger(ConsoleLogger(stderr, Error)) do
             solve(ensemble_prob, alg; trajectories=length(params), callback=steady_state_callback(tol), kwargs...)
