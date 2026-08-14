@@ -75,15 +75,16 @@ function simulate_pseudospectral(model; output_func=nothing, alg=ETDRK4(), num_v
             
         function _prob_func(prob, ctx)
             p = params[ctx.sim_id]
-            dt′ = dt/2^(ctx.repeat-1) # halve dt if solve was unsuccessful.
-            prob = remake(prob; p, dt=dt′, rng=ctx.rng)
+            _dt = dt/2^(ctx.repeat-1) # halve dt if solve was unsuccessful.
+            @warn "retry with dt <- dt/2"
+            prob = remake(prob; p, dt=_dt, rng=ctx.rng)
         end
 
-        ensemble_prob = EnsembleProblem(prob; _prob_func, _output_func)
+        ensemble_prob = EnsembleProblem(prob; prob_func=_prob_func, output_func=_output_func)
         
-        with_logger(ConsoleLogger(stderr, Error)) do
-            solve(ensemble_prob, alg; trajectories=length(params), callback=steady_state_callback(tol), kwargs...)
-        end
+        # with_logger(ConsoleLogger(stderr, Error)) do
+        solve(ensemble_prob, alg; trajectories=length(params), callback=steady_state_callback(tol), kwargs...)
+        # end
     end
 end
 
