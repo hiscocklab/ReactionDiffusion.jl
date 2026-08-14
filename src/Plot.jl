@@ -18,9 +18,22 @@ using NativeFileDialog: save_file
 Simulate and plot the results. The remaining `kwargs` are passed to `simulate`.
 """
 function timeseries_plot(model, params; normalise=true, hide_y=true, autolimits=true, species=nothing, kwargs...)
-    u, t = simulate(model, params; full_solution = true, kwargs...)
-    timeseries_plot(model, u, t; normalise = normalise, hide_y = hide_y, autolimits = autolimits, species = species)
+    sol = simulate(model, params; full_solution = true, kwargs...)
+    timeseries_plot(model, sol; normalise = normalise, hide_y = hide_y, autolimits = autolimits, species = species)
 end
+
+"""
+    function timeseries_plot(model, sol; normalise=true, hide_y=true, autolimits=true, kwargs...)
+
+Display a solution in an interactive plot with a scrubber to move through time.
+
+If `normalise` is true, values for different species will be normalised to a common scale.
+"""
+function timeseries_plot(model, sol; normalise=true, hide_y=true, autolimits=true, species=nothing, kwargs...)
+    u = stack(sol.u)
+    timeseries_plot(model, u, sol.t; normalise = normalise, hide_y = hide_y, autolimits = autolimits, species = species)
+end
+
 
 """
     function timeseries_plot(model, u, t; normalise=true, hide_y=true, autolimits=true, kwargs...)
@@ -30,7 +43,6 @@ Display a solution in an interactive plot with a scrubber to move through time.
 If `normalise` is true, values for different species will be normalised to a common scale.
 """
 function timeseries_plot(model, u, t; normalise=true, hide_y=true, autolimits=true, species=nothing, kwargs...)
-    
     model_species = Models.species(model)
     if isnothing(species)
         labels = [string(s.f) for s in model_species]
