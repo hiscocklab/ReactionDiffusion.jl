@@ -14,12 +14,12 @@ using Random: Xoshiro, seed!
 using NativeFileDialog: save_file
 
 
-function steady_state_plot(model,params; normalise=false, hide_y=false, kwargs...)
+function steady_state_plot(model,params; normalise=false, hide_y=normalise, kwargs...)
     sol = simulate(model,params; kwargs...)
-    steady_state_plot(model,sol; normalise=false, hide_y=false)
+    steady_state_plot(model,sol; normalise, hide_y)
 end
 
-function steady_state_plot(model, sol::PseudoSpectralSolution; normalise=false, hide_y=false, species=nothing)
+function steady_state_plot(model, sol::PseudoSpectralSolution; normalise=false, hide_y=normalise, species=nothing)
     u = eachcol(sol.u[end])
     model_species = Models.species(model)
     if isnothing(species)
@@ -39,7 +39,7 @@ function steady_state_plot(model, sol::PseudoSpectralSolution; normalise=false, 
 
 	fig = Figure()
 	ax = Axis(fig[1,1], xlabel = "x / L", ylabel = "Concentration") # TODO have axis labels passed in as kwargs
-	hide_y && hideydecorations!(ax)
+	hide_y && hideydecorations!(ax; label=false)
 	for (u, label) in zip(u, labels)
 		lines!(ax, x, u; label)
 	end
@@ -51,36 +51,36 @@ function steady_state_plot(model, sol::PseudoSpectralSolution; normalise=false, 
     fig
 end
 """
-    timeseries_plot(model, params; normalise=true, hide_y=true, autolimits=true, kwargs...)
+    timeseries_plot(model, params; normalise=true, hide_y=normalise, autolimits=true, kwargs...)
 
 Simulate and plot the results. The remaining `kwargs` are passed to `simulate`.
 """
-function timeseries_plot(model, params; normalise=false, hide_y=false, autolimits=true, species=nothing, kwargs...)
+function timeseries_plot(model, params; normalise=false, hide_y=normalise, autolimits=true, species=nothing, kwargs...)
     sol = simulate(model, params; full_solution = true, kwargs...)
-    timeseries_plot(model, sol; normalise = normalise, hide_y = hide_y, autolimits = autolimits, species = species)
+    timeseries_plot(model, sol; normalise, hide_y, autolimits, species)
 end
 
 """
-    function timeseries_plot(model, sol; normalise=true, hide_y=true, autolimits=true, kwargs...)
+    function timeseries_plot(model, sol; normalise=true, hide_y=normalise, autolimits=true, kwargs...)
 
 Display a solution in an interactive plot with a scrubber to move through time.
 
 If `normalise` is true, values for different species will be normalised to a common scale.
 """
-function timeseries_plot(model, sol::PseudoSpectralSolution; normalise=false, hide_y=false, autolimits=true, species=nothing, kwargs...)
+function timeseries_plot(model, sol::PseudoSpectralSolution; normalise=false, hide_y=normalise, autolimits=true, species=nothing, kwargs...)
     u = stack(sol.u)
-    timeseries_plot(model, u, sol.t; normalise = normalise, hide_y = hide_y, autolimits = autolimits, species = species)
+    timeseries_plot(model, u, sol.t; normalise, hide_y, autolimits, species)
 end
 
 
 """
-    function timeseries_plot(model, u, t; normalise=true, hide_y=true, autolimits=true, kwargs...)
+    function timeseries_plot(model, u, t; normalise=true, hide_y=normalise, autolimits=true, kwargs...)
 
 Display a solution in an interactive plot with a scrubber to move through time.
 
 If `normalise` is true, values for different species will be normalised to a common scale.
 """
-function timeseries_plot(model, u, t; normalise=false, hide_y=false, autolimits=true, species=nothing, kwargs...)
+function timeseries_plot(model, u, t; normalise=false, hide_y=normalise, autolimits=true, species=nothing, kwargs...)
     model_species = Models.species(model)
     if isnothing(species)
         labels = [string(s.f) for s in model_species]
@@ -96,7 +96,7 @@ function timeseries_plot(model, u, t; normalise=false, hide_y=false, autolimits=
 
 	fig = Figure()
 	ax = Axis(fig[1,1], xlabel = "x / L", ylabel = "Concentration") # TODO have axis labels passed in as kwargs
-	hide_y && hideydecorations!(ax)
+	hide_y && hideydecorations!(ax;label=false)
     sg = SliderGrid(fig[2,1], (label = "t", range = eachindex(t), format = i -> @sprintf("%.2f", t[i])))
 
     sl = sg.sliders[1]
@@ -106,9 +106,7 @@ function timeseries_plot(model, u, t; normalise=false, hide_y=false, autolimits=
 		lines!(ax, x, U, label = label)
 	end
 
-    if normalise
-        ylims!(ax, -0.05, 1 + 0.05)
-    elseif autolimits
+    if autolimits
         on(sl.value) do _
             autolimits!(ax)
         end
@@ -120,18 +118,20 @@ function timeseries_plot(model, u, t; normalise=false, hide_y=false, autolimits=
 end
 
 """
-    interactive_plot(model, param_ranges; hide_y=true, num_verts=32, kwargs...)
+    interactive_plot(model, param_ranges; normalise=false, hide_y=normalise, autolimits=true, num_verts=32, kwargs...)
 
 Generate an interactive plot of the steady state solution with sliders to adjust each of the parameters within `param_ranges`.
 `param_ranges` should be a dictionary mapping parameter names to either `Range` objects or collections of possible values.
 """
-function interactive_plot(model, param_ranges; normalise=false, hide_y=false, tspan=Inf64, tol=1e-5, num_verts=32, dt=0.01, seed=123, kwargs...)
-    param_ranges = sort(param_ranges)
+function interactive_plot(model, params; param_ranges=nothing, normalise=false, hide_y=normalise, autolimits=true, tspan=Inf64, tol=1e-5, num_verts=32, dt=0.01, seed=123, kwargs...)
+    params = sort(params)
+    param_ranges = something(param_ranges,
+        Dict(k => range(0.0,2*v,100) for (k,v) in params)) # Parameter sliders go from 0 to 2*params by default.
     fig = Figure()
     layout = make_layout(fig)
     ax = Axis(layout.ax, title=name(model), xlabel = "x / L", ylabel = "Concentration", yticklabelspace = 50.0)
-    hide_y && hideydecorations!(ax)
-    param_sliders = make_param_sliders(layout.param_sliders, param_ranges; width=300)
+    hide_y && hideydecorations!(ax;label=false)
+    param_sliders = make_param_sliders(layout.param_sliders, param_ranges, params; width=300)
     TMAX = Observable(0.0)
     state = Observable(:stop)
     recording = Observable(false)
@@ -176,7 +176,7 @@ function interactive_plot(model, param_ranges; normalise=false, hide_y=false, ts
 
     RealT = Observable(0.0)
     TT = throttle(1/120, RealT)
-    T = @lift min($TT, int[].ss)
+    T = @lift min($TT, int[].ss, tspan)
     U = lift(f, T)
 
     x = range(0, 1, num_verts)
@@ -185,12 +185,11 @@ function interactive_plot(model, param_ranges; normalise=false, hide_y=false, ts
         lines!(ax, x, lift(u -> u[:, i], U); label=labels[i])
     end
 
-    !normalise && on(U) do _
-	    autolimits!(ax)
-	end
-    dy = 0.05 # padding of the plot in y
-    normalise ? ylims!(ax, -dy, 1 + dy) : nothing
-
+    if autolimits
+        on(U) do _
+            autolimits!(ax)
+        end
+    end
     legend = Legend(layout.legend, ax; orientation= :horizontal)
     
 
@@ -308,8 +307,8 @@ function make_layout(fig)
         play_button, reset_button, skip_button, record_button, capture_button)
 end
 
-function make_param_sliders(f, param_ranges; width=nothing)
-    slider_specs = [eltype(v) <: AbstractFloat ? (label=string(k), range = v, format = x -> @sprintf("%.2f",x)) : (label=string(k), range = 1:length(v)) for (k,v) in param_ranges]
+function make_param_sliders(f, param_ranges, params; width=nothing)
+    slider_specs = [eltype(v) <: AbstractFloat ? (label=string(k), range = v, startvalue=params[k], format = x -> @sprintf("%.2f",x)) : (label=string(k), range = 1:length(v)) for (k,v) in param_ranges]
     SliderGrid(f, slider_specs...; width=width)
 end
 
