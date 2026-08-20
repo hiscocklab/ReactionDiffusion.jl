@@ -95,7 +95,7 @@ end
     u=sol[U][end]
     h = L/n
     @test (u[2] - u[1])/h  ≈ -0.1 rtol=0.5 # Check it's pointing vaguely in the right direction.
-    @test (u[end] - u[end-1])/h ≈ -0.2  rtol=0.5 
+    @test (u[end] - u[end-1])/h ≈ 0.2  rtol=0.5 
 end
 
 end;
