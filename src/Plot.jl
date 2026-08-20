@@ -179,7 +179,6 @@ function interactive_plot(model, param_ranges; normalise=false, hide_y=false, ts
 
     on(T) do t
         t_end = isinf(tspan) ? int[].ss : tspan
-        @show tspan, int[].ss, t_end
         if t >= t_end
             t = t_end
             state[]= :stop
