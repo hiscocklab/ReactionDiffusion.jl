@@ -86,8 +86,8 @@ end
 Generate an interactive plot of the steady state solution with sliders to adjust each of the parameters within `param_ranges`.
 `param_ranges` should be a dictionary mapping parameter names to either `Range` objects or collections of possible values.
 """
-function interactive_plot(model, param_ranges; normalise=false, hide_y=false, num_verts=32, dt=0.01, seed=123, kwargs...)
-	param_ranges = sort(param_ranges)
+function interactive_plot(model, param_ranges; normalise=false, hide_y=false, tspan=Inf64, tol=1e-5, num_verts=32, dt=0.01, seed=123, kwargs...)
+    param_ranges = sort(param_ranges)
     fig = Figure()
     layout = make_layout(fig)
     ax = Axis(layout.ax, title=name(model), xlabel = "x / L", ylabel = "Concentration", yticklabelspace = 50.0)
@@ -123,9 +123,10 @@ function interactive_plot(model, param_ranges; normalise=false, hide_y=false, nu
 
     params = parameter_set(model, Dict(k => x isa Int ? v[x] : x for ((k, v), x) in zip(param_ranges, [p[] for p in P])))
     rng=Xoshiro(seed)
-    prob = PseudoSpectralProblem(model, num_verts; p=params, dt, rng, kwargs...)
-    int = Ref(init(prob, callback=steady_state_callback()))
-    
+    prob = PseudoSpectralProblem(model, num_verts; p=params, dt, rng, tspan, kwargs...)
+    callback = isinf(tspan) ? steady_state_callback(tol) : nothing # Only stop at steady state if tspan isn't specified.
+
+    int = Ref(init(prob; callback))
 
     onany(P...) do p...
         params = parameter_set(model, Dict(k => x isa Int ? v[x] : x for ((k, v), x) in zip(param_ranges, p)))
@@ -177,9 +178,10 @@ function interactive_plot(model, param_ranges; normalise=false, hide_y=false, nu
     end
 
     on(T) do t
-        ss = int[].ss
-        if t >= ss
-            t = ss
+        t_end = isinf(tspan) ? int[].ss : tspan
+        @show tspan, int[].ss, t_end
+        if t >= t_end
+            t = t_end
             state[]= :stop
         end
         TMAX[] = max(TMAX[],t)
