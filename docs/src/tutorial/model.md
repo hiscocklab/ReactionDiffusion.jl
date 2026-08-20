@@ -51,5 +51,5 @@ Note, any reactants that are not assigned a diffusion constant are assumed to be
 Finally we combine the two compontents to produce a `Model` object which describes the complete system.
 
 ```
-model = Model(reaction, diffusion)
+model = Model(reaction, diffusion; name="BMP Signalling Dynamics")
 ```

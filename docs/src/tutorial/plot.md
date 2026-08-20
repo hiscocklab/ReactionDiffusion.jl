@@ -11,12 +11,7 @@ Use the slider to view the solution at different points in time.
 For a fully interactive simulation, use the `interactive_plot` tool. This will allow you to adjust parameters and view the resulting solution in real time.
 
 ```julia
-param_ranges = dict(
-    μ₁ = range(0.5,2.0,100),
-    μ₂ = [x->exp(-λ*x) for λ in range(1.0,10.0,100)],
-    D₃ = range(1.0,100.0,100)
-)
-interactive_plot(model, param_ranges)
+interactive_plot(model, params)
 ```
 
 Each parameter in `param_ranges` can be adjusted within the given range using the sliders. Here we provide a range of functions for μ₂ which produce varying spatial gradients.

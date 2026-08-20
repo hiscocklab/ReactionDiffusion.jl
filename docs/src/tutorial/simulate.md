@@ -5,18 +5,12 @@ Having now screened through parameter sets, we can now simulate the correspondin
 To simulate the system for a single parameters set, simply run:
 
 ```julia
-u,t = simulate(model, turing_params[1])
+sol = simulate(model, turing_params[1])
 ```
-This will return the solution as an array containg the concentration values, and the time at which steady state was reached. The first dimension of u corresponds to points in space and the second to reactants.
+This will return a solution object which can be indexed by species (`sol[NOG]`) to return a vector of concentrations for NOG at each time step, or by time index (`sol[end]`) to return a vector of num_verts x num_species matrices.
 
-For instance if `species(model) == [GDF5, NOG, COMPLEX, pSMAD]`, then `u[1,3]` is the concetration of `COMPLEX` at the left-most end of the domain at the conclusion of the simulation, and `t` will be the time at which this occurs.
+For instance if `species(model) == [GDF5, NOG, COMPLEX, pSMAD]`, then `sol[end][1,3]` is the concetration of `COMPLEX` at the left-most end of the domain at the conclusion of the simulation, and `sol.t[end]` will be the time at which this occurs. Alternatively the same value may be accessed to by species, as `sol[COMPLEX][end][end]`.
 
-To save the complete time series rather than just the steady state value, we can use the `full_solution` option.
-```julia
-u,t = simulate(model, turing_params[1]; full_solution=true)
-```
-
-Here `u[1,3,i]` is the concetration of `COMPLEX` at the left-most end of the domain after the ith time step, and `t[i]` is the time at which this occurs.
 
 A collection of parameter sets can be simulated as an ensemble
 ```julia

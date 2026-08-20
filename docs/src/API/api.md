@@ -19,6 +19,7 @@ simulate
 turing_wavelength
 is_turing
 filter_turing
+steady_state_plot
 timeseries_plot
 interactive_plot
 
