@@ -1,5 +1,5 @@
 module Plot
-export timeseries_plot, interactive_plot
+export steady_state_plot, timeseries_plot, interactive_plot
 using PseudoSpectralReactionDiffusion
 using ..Simulate
 using ..Models
@@ -12,6 +12,44 @@ using CairoMakie
 using Observables
 using Random: Xoshiro, seed!
 using NativeFileDialog: save_file
+
+
+function steady_state_plot(model,params; normalise=false, hide_y=false, kwargs...)
+    sol = simulate(model,params; kwargs...)
+    steady_state_plot(model,sol; normalise=false, hide_y=false)
+end
+
+function steady_state_plot(model, sol::PseudoSpectralSolution; normalise=false, hide_y=false, species=nothing)
+    u = eachcol(sol.u[end])
+    model_species = Models.species(model)
+    if isnothing(species)
+        labels = [string(s.f) for s in model_species]
+    else
+        ix = [i for (i,s) in enumerate(model_species) if nameof(s.f) ∈ species]
+        u = u[ix]
+        labels = [string(s.f) for s in model_species[ix]]
+    end
+
+    num_verts = length(u[1])
+    x = range(0.0, 1.0, num_verts)
+
+    if normalise
+        @. u = u / maximum(u)
+    end
+
+	fig = Figure()
+	ax = Axis(fig[1,1], xlabel = "x / L", ylabel = "Concentration") # TODO have axis labels passed in as kwargs
+	hide_y && hideydecorations!(ax)
+	for (u, label) in zip(u, labels)
+		lines!(ax, x, u; label)
+	end
+
+	autolimits!(ax)
+
+	axislegend(ax)
+    display(fig)
+    fig
+end
 """
     timeseries_plot(model, params; normalise=true, hide_y=true, autolimits=true, kwargs...)
 
@@ -52,8 +90,8 @@ function timeseries_plot(model, u, t; normalise=false, hide_y=false, autolimits=
         labels = [string(s.f) for s in model_species[ix]]
     end
 
-    x_steps = size(u, 1)
-    x = range(0.0, 1.0, length = x_steps)
+    num_verts = size(u, 1)
+    x = range(0.0, 1.0, num_verts)
 	r = normalise ? maximum.(eachslice(u, dims = 2)) : ones(size(u)[2:3]) # find max value for each species across all time
 
 	fig = Figure()
@@ -68,12 +106,13 @@ function timeseries_plot(model, u, t; normalise=false, hide_y=false, autolimits=
 		lines!(ax, x, U, label = label)
 	end
 
-	!normalise && autolimits && on(sl.value) do _
-	    autolimits!(ax)
+    if normalise
+        ylims!(ax, -0.05, 1 + 0.05)
+    elseif autolimits
+        on(sl.value) do _
+            autolimits!(ax)
+        end
 	end
-
-    dy = 0.05 # padding of the plot in y
-    normalise ? ylims!(ax, -dy, 1 + dy) : nothing
 
 	axislegend(ax)
     display(fig)
