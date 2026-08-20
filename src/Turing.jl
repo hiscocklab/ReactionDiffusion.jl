@@ -33,7 +33,7 @@ function turing_wavelength(model; k=logrange(0.01,1000,1000))
     
     if isnothing(ss)
         # Fall back to numerical solution.
-        @warn "Solve can not solve this input currently. Falling back to finding numeric steady state solutions."
+        @warn "Symbolics.symbolic_solve can not solve this input currently. Falling back to finding steady state solutions numerically."
         (f,f!) = build_function(du, u, ps, (); expression=Val{false})
         (fjac,fjac!) = build_function(jac, u, ps; expression=Val{false})
         u0 = zeros(num_species(model))
