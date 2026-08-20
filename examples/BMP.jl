@@ -1,4 +1,5 @@
-using ReactionDiffusion
+using ReactionDiffusion, WGLMakie
+WGLMakie.activate!(resize_to=:body) 
 
 reaction = @reaction_network begin
     # complex formation
@@ -20,25 +21,26 @@ diffusion = @diffusion_system L begin
     D₃,  COMPLEX
 end
 
+model = Model(reaction, diffusion; name="BMP Signalling Dynamics")
 
-model = Model(reaction, diffusion, initial)
-
-params = (
-    :μ₁ => 1.0,
-    :μ₂ => 10.0,
-    :k₊ => 40.0,
-    :k₋ => 40.0,
-    :μ₃ => 1.0,
-    :δ₁ => 0.1,
-    :δ₂ => 6.7,
-    :δ₃ => 1.0,
-    :K₁ => 0.01,
-    :K₂ => 0.01,
-    :n₁ => 8.0,
-    :n₂ => 2.0,
-    :D₁ => 1.0,
-    :D₂ => 1.0,
-    :D₃ => 30.0
+params = dict(
+    μ₁ = 1.0,
+    μ₂ = 10.0,
+    k₊ = 40.0,
+    k₋ = 40.0,
+    μ₃ = 1.0,
+    δ₁ = 0.1,
+    δ₂ = 6.7,
+    δ₃ = 1.0,
+    K₁ = 0.01,
+    K₂ = 0.01,
+    n₁ = 8.0,
+    n₂ = 2.0,
+    D₁ = 1.0,
+    D₂ = 1.0,
+    D₃ = 30.0,
+    L  = 45.0
 )
 
-interactive_plot(model, params; dt=0.001, num_verts=256)
+
+interactive_plot(model, params; dt=0.01, num_verts=64, tspan=700, normalise=true)
