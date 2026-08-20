@@ -76,7 +76,7 @@ function simulate_pseudospectral(model; output_func=nothing, alg=ETDRK4(), tspan
         function _prob_func(prob, ctx)
             p = params[ctx.sim_id]
             _dt = dt/2^(ctx.repeat-1) # halve dt if solve was unsuccessful.
-            @warn "retry with dt <- dt/2"
+            (ctx.repeat>1) && @warn "retry with dt <- dt/2"
             prob = remake(prob; p, dt=_dt, rng=ctx.rng)
         end
 
