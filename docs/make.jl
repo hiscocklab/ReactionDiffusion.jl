@@ -22,8 +22,7 @@ makedocs(
     checkdocs_ignored_modules = [Catalyst]
 )
 
-# deploydocs(repo = "github.com/hiscocklab/ReactionDiffusion.jl.git";
-#     push_preview = true)
+deploydocs(repo = "github.com/hiscocklab/ReactionDiffusion.jl.git"; push_preview = true)
 
 
 #run in Julia repl using: include("make.jl"), in the docs environment
