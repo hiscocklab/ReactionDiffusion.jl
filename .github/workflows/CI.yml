@@ -13,6 +13,10 @@ on:
       - dev
     paths-ignore:
       - 'docs/**'
+      
+permissions:
+  actions: write
+  contents: read
 
 jobs:
   test:
