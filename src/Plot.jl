@@ -14,11 +14,23 @@ using Random: Xoshiro, seed!
 using NativeFileDialog: save_file
 
 
-function steady_state_plot(model,params; normalise=false, hide_y=normalise, kwargs...)
+"""
+    function steady_state_plot(model, params; normalise=true, hide_y=normalise, kwargs...)
+
+Run a simulation and plot the final values for each species.
+If `normalise` is true, values for different species will be normalised to a common scale.
+"""
+function steady_state_plot(model, params; normalise=false, hide_y=normalise, kwargs...)
     sol = simulate(model,params; kwargs...)
     steady_state_plot(model,sol; normalise, hide_y)
 end
 
+"""
+    function steady_state_plot(model, sol; normalise=true, hide_y=normalise, kwargs...)
+
+Plot the final value in the solution object for each species.
+If `normalise` is true, values for different species will be normalised to a common scale.
+"""
 function steady_state_plot(model, sol::PseudoSpectralSolution; normalise=false, hide_y=normalise, species=nothing)
     u = eachcol(sol.u[end])
     model_species = Models.species(model)
@@ -53,7 +65,8 @@ end
 """
     timeseries_plot(model, params; normalise=true, hide_y=normalise, autolimits=true, kwargs...)
 
-Simulate and plot the results. The remaining `kwargs` are passed to `simulate`.
+Simulate and display the results with an interactive slider to move through time. The remaining `kwargs` are passed to `simulate`.
+If `normalise` is true, values for different species will be normalised to a common scale.
 """
 function timeseries_plot(model, params; normalise=false, hide_y=normalise, autolimits=true, species=nothing, kwargs...)
     sol = simulate(model, params; full_solution = true, kwargs...)
@@ -61,10 +74,9 @@ function timeseries_plot(model, params; normalise=false, hide_y=normalise, autol
 end
 
 """
-    function timeseries_plot(model, sol; normalise=true, hide_y=normalise, autolimits=true, kwargs...)
+    timeseries_plot(model, sol; normalise=true, hide_y=normalise, autolimits=true, kwargs...)
 
-Display a solution in an interactive plot with a scrubber to move through time.
-
+Display the solution with an interactive slider to move through time.
 If `normalise` is true, values for different species will be normalised to a common scale.
 """
 function timeseries_plot(model, sol::PseudoSpectralSolution; normalise=false, hide_y=normalise, autolimits=true, species=nothing, kwargs...)
@@ -74,10 +86,9 @@ end
 
 
 """
-    function timeseries_plot(model, u, t; normalise=true, hide_y=normalise, autolimits=true, kwargs...)
+    timeseries_plot(model, u, t; normalise=true, hide_y=normalise, autolimits=true, kwargs...)
 
-Display a solution in an interactive plot with a scrubber to move through time.
-
+Display the solution with an interactive slider to move through time.
 If `normalise` is true, values for different species will be normalised to a common scale.
 """
 function timeseries_plot(model, u, t; normalise=false, hide_y=normalise, autolimits=true, species=nothing, kwargs...)
