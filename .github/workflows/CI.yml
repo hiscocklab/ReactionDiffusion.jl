@@ -24,6 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       JULIA_NUM_THREADS: ${{ matrix.julia-threads }}
+      JULIA_PKG_SERVER_REGISTRY_PREFERENCE: eager
     strategy:
       matrix:
         group:
