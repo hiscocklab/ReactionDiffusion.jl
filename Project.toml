@@ -36,5 +36,6 @@ WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 [compat]
 CairoMakie = "0.15.13"
 Catalyst = "16.2.0"
+ModelingToolkit = "11.39.1"
 NativeFileDialog = "0.2.1"
 PseudoSpectralReactionDiffusion = "≥ 1.0.1"
