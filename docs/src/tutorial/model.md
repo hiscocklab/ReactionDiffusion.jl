@@ -5,7 +5,7 @@ In the following sections, we go step-by-step through the code used in the Quick
 We first specify the *reaction* part of the reaction-diffusion system, using the intuitive syntax developed in [Catalyst.jl](https://github.com/SciML/Catalyst.jl). This allows models to be written in a very natural way which reflects the (bio)-chemical interactions involved in the system: 
 
 ```julia
-model = @reaction_network begin
+reaction = @reaction_network begin
     # complex formation
     (k₊, k₋),               GDF5 + NOG <--> COMPLEX 
     # degradation
@@ -36,4 +36,20 @@ model = @reaction_network begin
     myOwnHillrFunction(pSMAD,μ₁,K₁,n₁),  ∅ --> GDF5
 # ...
 end
+
+Second we define the *diffusion* part of the system by providing a set of transport reactions, each of which associate a diffusion rate parameter with one of the reactants. We also supply a parameter `L` which determines the size of the domain in which diffusion occurs.
+
+diffusion = @diffusion_system L begin
+    D_GDF5,     GDF5
+    D_NOG,      NOG
+    D_COMPLEX,  COMPLEX
+end
+```
+
+Note, any reactants that are not assigned a diffusion constant are assumed to be non-diffusing (i.e., `pSMAD` in this example).
+
+Finally we combine the two compontents to produce a `Model` object which describes the complete system.
+
+```
+model = Model(reaction, diffusion; name="BMP Signalling Dynamics")
 ```

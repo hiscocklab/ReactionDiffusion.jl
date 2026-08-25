@@ -1,17 +1,18 @@
 module ReactionDiffusion
+include("Util.jl")
+include("Models.jl")
+include("Simulate.jl")
+include("Turing.jl")
+# include("Optimise.jl")
+include("Plot.jl")
 
-using Catalyst, Combinatorics, Random, StructArrays
-using DifferentialEquations, LinearAlgebra, ModelingToolkit, Symbolics
-using JLD2
-using ProgressMeter
-using RecipesBase
-
-include("package_scripts.jl")
-
-export returnTuringParams, @reaction_network, model_parameters, screen_values
-export get_params, get_param
-export simulate
-export @save, @load
-export endpoint, timepoint
-
+using Reexport
+@reexport using .Models
+@reexport using .Simulate
+@reexport using .Turing
+@reexport using .Util: dict, product
+@reexport using Catalyst: @reaction_network
+# @reexport using .Optimise
+@reexport using .Plot
+@reexport using PseudoSpectralReactionDiffusion
 end

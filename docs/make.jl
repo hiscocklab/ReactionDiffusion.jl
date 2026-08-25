@@ -1,28 +1,28 @@
-push!(LOAD_PATH,"../src/")
+#push!(LOAD_PATH,"../src/")
 
-using Documenter, ReactionDiffusion
+using Documenter, ReactionDiffusion, PseudoSpectralReactionDiffusion, Catalyst
 
-pages = Any["Home" => "index.md",
-            "Tutorial" => Any["tutorial/installation.md",
-            "tutorial/model.md","tutorial/params.md","tutorial/screen.md","tutorial/simulate.md","tutorial/save.md",],
-            # "Examples" => Any["examples/cima.md","examples/gm.md","examples/schnakenburg.md"],
-            "API" => "API/api.md"
-            ]
-
-makedocs(sitename="ReactionDiffusion.jl",
+makedocs(
+    sitename="ReactionDiffusion.jl",
     format = Documenter.HTML(
         prettyurls = get(ENV, "CI", nothing) == "true",
         assets=["assets/favicon.ico"]
     ),
-    pages=pages,
-    doctest =false,
+    pages = [
+       "Home" => "index.md",
+       "Tutorial" => ["tutorial/installation.md", "tutorial/model.md", "tutorial/params.md", "tutorial/turing.md", "tutorial/simulate.md", "tutorial/simulate.md", "tutorial/save.md"],
+       # "Examples" => Any["examples/cima.md","examples/gm.md","examples/schnakenburg.md"],
+       "API" => "API/api.md",
+      #  "Cheatsheet" => "cheatsheet.md"
+    ],
+    doctest = false,
     clean=true,
-    modules=[ReactionDiffusion],
-
+    modules=[ReactionDiffusion, PseudoSpectralReactionDiffusion, Catalyst],
+    checkdocs=:none,
+    checkdocs_ignored_modules = [Catalyst]
 )
 
-deploydocs(repo = "github.com/hiscocklab/ReactionDiffusion.jl.git";
-    push_preview = true)
+deploydocs(repo = "github.com/hiscocklab/ReactionDiffusion.jl.git"; push_preview = true)
 
 
 #run in Julia repl using: include("make.jl"), in the docs environment

@@ -1,0 +1,56 @@
+
+
+"Return a vector of all polynomial terms in `vars`` up to degree `n``."
+polynomial_terms(vars, n) = fill([1;vars], n) |> splat(Iterators.product) .|> prod |> vec
+
+function rational_system(num_species, degree)
+    t = default_t()
+    X = defspecies(:X, t, num_species)
+    terms = polynomial_terms(X, degree)
+    R = defparams(:R, (2*num_species, length(terms)))
+    D = defparams(:D, num_species)
+    @parameters L
+    rates = R*terms
+    rxs₊ = [Reaction(r,nothing,[x]) for (r,x) in zip(rates[1:num_species], X)]
+    rxs₋ = [Reaction(r,[x],nothing) for (r,x) in zip(rates[num_species+1:end], X)]
+    rxs = [rxs₊ ; rxs₋]
+    @named reaction = ReactionSystem(rxs,t)
+    dxs = [TransportReaction(d/L^2, x) for (d,x) in zip(D, X)]
+    diffusion = ReactionDiffusion.DiffusionSystem(L, dxs)
+    Model(reaction,diffusion)
+end
+
+function hill_system(graph)
+    num_params = size(graph,1)
+    t = default_t()
+    X = defspecies(:X, t, num_params)
+
+    rates₊ = defparams(:μ, num_params)
+    rates₋ = defparams(:δ, num_params)
+    for i in eachindex(X)
+        for j in eachindex(X)
+            sign = graph[i,j]
+            iszero(sign) && continue
+            x = X[j]
+            K = defparam(:K, i, j)
+            n = defparam(:n, i, j)
+            f = sign > 0 ? hill : hillr
+            rates₊[i] *= f(x, 1, K, n)
+        end
+    end
+    X1 = [[x] for x in X]
+    rxs = [Reaction.(rates₊, nothing, X1) ; Reaction.(rates₋, X1, nothing)]
+    @named reaction = ReactionSystem(rxs, t)
+    D = defparams(:D, num_params)
+    @parameters L
+    dxs = [TransportReaction(d/L^2, x) for (d,x) in zip(D, X)]
+    diffusion = ReactionDiffusion.DiffusionSystem(L, dxs)
+    Model(reaction,diffusion)
+end
+
+
+function random_signed_digraph(n, sparsity)
+    w = (1-sparsity)/2
+    weights = Weights([w, sparsity, w], 1.0)
+    sample([-1,0,1], weights, (n,n))
+end

@@ -1,4 +1,12 @@
-# ReactionDiffusion.jl for modelling pattern formation in biological systems
+```@raw html
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/banner-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="assets/banner.svg">
+  <img alt="ReactionDiffusion.jl" src="assets/banner.svg">
+</picture>
+```
+
+# A simulation and visualisation package for 1D reaction-diffusion systems.
 
 Reaction-diffusion dynamics are present across many areas of the physical and natural world, and allow complex spatiotemporal patterns to self-organize *de novo*. `ReactionDiffusion.jl` aims to be an easy-to-use and performant pipeline to simulate reaction-diffusion PDEs of arbitrary complexity, with a focus on pattern formation in biological systems. Using this package, complex, biologically-inspired reaction-diffusion models can be:
 
@@ -12,10 +20,10 @@ Here we show how `ReactionDiffusion.jl` can be used to simulate a biologically-i
 
 We begin by specifying the reaction-diffusion dynamics via the intuitive syntax developed in [Catalyst.jl](https://github.com/SciML/Catalyst.jl), which naturally mirrors biochemical feedbacks and interactions.
 
-```@example quickstart
+```julia
 using ReactionDiffusion
 
-model = @reaction_network begin
+reaction = @reaction_network begin
     # complex formation
     (k₊, k₋),               GDF5 + NOG <--> COMPLEX 
     # degradation
@@ -27,70 +35,72 @@ model = @reaction_network begin
     hillr(pSMAD,μ₂,K₂,n₂),  ∅ --> NOG
     # signalling
     μ₃*GDF5,                ∅ --> pSMAD
-end  
+end
+
+diffusion = @diffusion_system L begin
+    D₁, GDF5,
+    D₂, NOG,
+    D₃, COMPLEX
+end
+
+model = Model(reaction, diffusion)
 ```
 
-We can then specify values for each parameter:
+We can then specify possible values for each parameter:
 
-```@example quickstart
-params = model_parameters()
-
-# constant parameters
-params.reaction["δ₃"] = [1.0]
-params.reaction["μ₁"] = [1.0]
-params.reaction["μ₃"] = [1.0]
-params.reaction["n₁"] = [8]
-params.reaction["n₂"] = [2]
-
-# varying parameters
-num_params = 5
-params.reaction["δ₁"] = screen_values(min = 0.1,max = 10, number=num_params)
-params.reaction["δ₂"] = screen_values(min = 0.1,max = 10,number=num_params)
-params.reaction["μ₂"] = screen_values(min = 0.1,max = 10, number=num_params)
-params.reaction["k₊"] = screen_values(min = 10.0,max = 100.0, number=num_params)
-params.reaction["k₋"] = screen_values(min = 10.0,max = 100.0, number=num_params)
-params.reaction["K₁"] = screen_values(min = 0.01,max = 1,number=num_params)
-params.reaction["K₂"] = screen_values(min = 0.01,max = 1, number=num_params)
-params.reaction
-
-```
-
-We must then also specify the diffusion coefficients for each variable:
-
-```@example quickstart
-params.diffusion = Dict(
-    "NOG"       => [1.0],
-    "GDF5"      => screen_values(min = 0.1,max = 30, number=10),
-    "COMPLEX"   => screen_values(min = 0.1,max = 30, number=10)
+```julia
+params = product(
+    μ₁ = [1.0],
+    μ₂ = range(0.1,10,5),
+    k₊ = range(10,100, 5),
+    k₋ = range(10,100,5),
+    μ₃ = [1.0],
+    δ₁ = range(0.1,10,5),
+    δ₂ = range(0.1,10,5),
+    δ₃ = [1.0],
+    K₁ = range(0.01,1.0,5),
+    K₂ = range(0.01,1.0,5),
+    n₁ = [8.0],
+    n₂ = [2.0],
+    D₁ = [1.0],
+    D₂ = range(0.1,30,10),
+    D₃ = range(0.1,30,10)
 )
-params.diffusion
 ```
 
 Then, with a single line of code, we can perform a Turing instability analysis across all combinations of parameters:
 
-```@repl quickstart
-turing_params = returnTuringParams(model, params);
+```julia
+turing_params = filter_turing(model, params);
 ```
 
-This returns all parameter combinations that can break symmetry from a homogeneous initial condition. We take advantage of the highly performant numerical solvers in [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl) to be able to simulate millions of parameter sets per minute on a standard laptop. 
+This returns all parameter combinations that can break symmetry from a homogeneous initial condition.
 
-We may then take a single parameter set and simulate its spatiotemporal dynamics directly, using `Plots.jl` to visualize the resulting pattern:
+We may then take a collection of parameter sets and simulate their spatiotemporal dynamics directly.
 
-```@example quickstart
-param1 = get_params(model, turing_params[1000])
-sol = simulate(model,param1)
-
-using Plots
-plot(endpoint(),model,sol)
+```julia
+sol = simulate(model,turing_params)
 ```
 
-We may also view the full spatiotemporal dynamics:
+We may also view the full spatiotemporal dynamics of a particular parameter set:
 
-```@example quickstart
-@gif for t in 0.0:0.01:1
-    plot(timepoint(),model,sol,t)
-end fps=20
+```julia
+using WGLMakie
+timeseries_plot(model,turing_params[4])
 ```
+
+Or view the results of adjusting parameters of interest in real time.
+
+```julia
+param_ranges = dict(
+    μ₁ = range(0.5,2.0,100),
+    μ₂ = [x->exp(-λ*x) for λ in range(1.0,10.0,100)],
+    D₃ = range(1.0,100.0,100)
+)
+interactive_plot(model, param_ranges)
+```
+
+We take advantage of psuedo-spectral methods in combination with the highly performant numerical solvers in [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl) to be able to simulate millions of parameter sets per minute on a standard laptop. 
 
 
 ## Support, citation and future developments
