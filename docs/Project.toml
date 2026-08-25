@@ -6,4 +6,4 @@ ReactionDiffusion = "dcda7c7e-49c0-481c-982d-c35bedad83cd"
 
 [compat]
 Documenter = "1.8"
-ReactionDiffusion = "0.2"
+ReactionDiffusion = "1.0.0"
