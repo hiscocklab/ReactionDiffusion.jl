@@ -1,4 +1,8 @@
-![Banner](./assets/banner.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/banner-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="assets/banner.svg">
+  <img alt="ReactionDiffusion.jl" src="assets/banner.svg">
+</picture>
 
 # A simulation and visualisation package for 1D reaction-diffusion systems.
 

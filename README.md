@@ -1,4 +1,8 @@
-![Banner](docs/src/assets/banner.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/src/assets/banner-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/src/assets/banner.svg">
+  <img alt="ReactionDiffusion.jl" src="docs/src/assets/banner.svg">
+</picture>
 
 ![Build Status](https://github.com/hiscocklab/ReactionDiffusion.jl/actions/workflows/CI.yml/badge.svg)
 [![Latest Release (for users)](https://img.shields.io/badge/docs-stable-blue.svg)](https://hiscocklab.github.io/ReactionDiffusion.jl/stable)
