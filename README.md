@@ -1,4 +1,4 @@
-# ReactionDiffusion.jl
+![Banner](docs/src/assets/banner.svg)
 
 ![Build Status](https://github.com/hiscocklab/ReactionDiffusion.jl/actions/workflows/CI.yml/badge.svg)
 [![Latest Release (for users)](https://img.shields.io/badge/docs-stable-blue.svg)](https://hiscocklab.github.io/ReactionDiffusion.jl/stable)
