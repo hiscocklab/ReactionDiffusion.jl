@@ -69,7 +69,7 @@ Simulate and display the results with an interactive slider to move through time
 If `normalise` is true, values for different species will be normalised to a common scale.
 """
 function timeseries_plot(model, params; normalise=false, hide_y=normalise, autolimits=true, species=nothing, kwargs...)
-    sol = simulate(model, params; full_solution = true, kwargs...)
+    sol = simulate(model, params; kwargs...)
     timeseries_plot(model, sol; normalise, hide_y, autolimits, species)
 end
 
@@ -134,10 +134,13 @@ end
 Generate an interactive plot of the steady state solution with sliders to adjust each of the parameters within `param_ranges`.
 `param_ranges` should be a dictionary mapping parameter names to either `Range` objects or collections of possible values.
 """
-function interactive_plot(model, params; param_ranges=nothing, normalise=false, hide_y=normalise, autolimits=true, tspan=Inf64, tol=1e-5, num_verts=32, dt=0.01, seed=123, kwargs...)
+function interactive_plot(model, params; param_ranges=Dict(), normalise=false, hide_y=normalise, autolimits=true, tspan=Inf64, tol=1e-5, num_verts=32, dt=0.01, seed=123, kwargs...)
     params = sort(params)
-    param_ranges = something(param_ranges,
-        Dict(k => range(0.0,2*v,100) for (k,v) in params)) # Parameter sliders go from 0 to 2*params by default.
+    for (k,v) in params
+        get!(param_ranges, k) do
+            range(0.0,2*v,100) # Parameter sliders go from 0 to 2*params by default.
+        end
+    end
     fig = Figure()
     layout = make_layout(fig)
     ax = Axis(layout.ax, title=name(model), xlabel = "x / L", ylabel = "Concentration", yticklabelspace = 50.0)
