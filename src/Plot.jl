@@ -106,7 +106,7 @@ function timeseries_plot(model, u, t; normalise=false, hide_y=normalise, autolim
 	r = normalise ? maximum.(eachslice(u, dims = 2)) : ones(size(u)[2:3]) # find max value for each species across all time
 
 	fig = Figure()
-	ax = Axis(fig[1,1], xlabel = "x / L", ylabel = "Concentration") # TODO have axis labels passed in as kwargs
+	ax = Axis(fig[1,1], xlabel = "x / L", ylabel = "Concentration", yticklabelspace = 50.0) # TODO have axis labels passed in as kwargs
 	hide_y && hideydecorations!(ax;label=false)
     sg = SliderGrid(fig[2,1], (label = "t", range = eachindex(t), format = i -> @sprintf("%.2f", t[i])))
 
