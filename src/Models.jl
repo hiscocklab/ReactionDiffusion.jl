@@ -17,7 +17,7 @@ export ODESystem
 
 using Symbolics: Num, value, get_variables, @variables, getname, substitute
 import Catalyst # Catalyst.species and Catalyst.parameters would conflict with our functions.
-using Catalyst: numspecies, numparams, assemble_oderhs, @species, @parameters, @reaction_network, ExprValues, get_usexpr, get_psexpr, esc_dollars!, find_parameters_in_rate!, forbidden_symbol_check, DEFAULT_IV_SYM, default_t, setmetadata, ReactionSystem, independent_variable
+using Catalyst: numspecies, numparams, assemble_oderhs, @species, @parameters, @reaction_network, ExprValues, get_usexpr, get_psexpr, esc_dollars!, find_parameters_in_rate!, forbidden_symbol_check, DEFAULT_IV_SYM, default_t, setmetadata, ReactionSystem, independent_variable, recursive_escape_functions!
 import ModelingToolkit # Needed for internal Catalyst functions.
 using ..Util: subst, ensure_function, zip_dict
 using Pipe
@@ -300,6 +300,7 @@ function parse_body(body, source)
 
     for b in body.args
         r, s = b.args
+        recursive_escape_functions!(r) ## test
         # Handle interpolation of variables
         r = parse_expr!(parameters,r)
         s = esc_dollars!(s)
