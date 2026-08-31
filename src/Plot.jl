@@ -12,6 +12,7 @@ using CairoMakie
 using Observables
 using Random: Xoshiro, seed!
 using NativeFileDialog: save_file
+const symbol_font = normpath(@__DIR__, "..", "fonts", "NotoSansSymbols2-Regular.ttf")
 
 
 """
@@ -152,14 +153,14 @@ function interactive_plot(model, params; param_ranges=Dict(), normalise=false, h
     TMAX = Observable(0.0)
     state = Observable(:stop)
     recording = Observable(false)
-
+    @show symbol_font
     t_slider_grid = SliderGrid(layout.t_slider, (label = "t", range = @lift(0.0:0.01:$TMAX), format = "{:.2f}"))
     t_slider = t_slider_grid.sliders |> only
-    play_button = Button(layout.play_button; label=@lift(if $state==:stop "▶" else "⏸" end), font="Segoe UI Symbol")
-    reset_button = Button(layout.reset_button; label="⏮")
-    skip_button = Button(layout.skip_button; label="⏭", buttoncolor=@lift(if $state==:ff COLOR_ACCENT[] else RGBf(0.94, 0.94, 0.94) end))
-    record_button = Button(layout.record_button; label="⏺", buttoncolor=@lift(if $recording COLOR_ACCENT[] else RGBf(0.94, 0.94, 0.94) end), font="Segoe UI Symbol")
-    capture_button = Button(layout.capture_button; label="📷", font="Segoe UI Symbol")
+    play_button = Button(layout.play_button; label=@lift(if $state==:stop "▶" else "⏸" end), font=symbol_font)
+    reset_button = Button(layout.reset_button; label="⏮", font=symbol_font)
+    skip_button = Button(layout.skip_button; label="⏭", buttoncolor=@lift(if $state==:ff COLOR_ACCENT[] else RGBf(0.94, 0.94, 0.94) end), font=symbol_font)
+    record_button = Button(layout.record_button; label="⏺", buttoncolor=@lift(if $recording COLOR_ACCENT[] else RGBf(0.94, 0.94, 0.94) end), font=symbol_font)
+    capture_button = Button(layout.capture_button; label="📷", font=symbol_font)
 
     
 
