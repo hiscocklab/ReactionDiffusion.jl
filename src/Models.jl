@@ -249,14 +249,17 @@ Construct a SplitODEProblem to solve a reaction diffusion system with reflective
 
 Returns the SplitODEProblem with solutions in the frequency (DCT-1) domain and a FFTW plan to transform solutions back to the spatial domain.
 """
-function PseudoSpectralProblem(model, num_verts; kwargs...)
+function PseudoSpectralProblem(model, num_verts; p=nothing, kwargs...)
+    if !isnothing(p)
+        p=parameter_set(model, p)
+    end
     L = domain_size(model)
     S = species(model)
     R = reaction_rates(model)
     D = diffusion_rates(model)/L^2
     B = -L * boundary_flux(model)
     I = initial_conditions(model)
-    PseudoSpectralProblem(S, R, D, B, I, num_verts; kwargs...)
+    PseudoSpectralProblem(S, R, D, B, I, num_verts; p, kwargs...)
 end
                               
 function mol_problem(model, num_verts; noise=1e-4, kwargs...)
