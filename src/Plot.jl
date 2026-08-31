@@ -153,7 +153,6 @@ function interactive_plot(model, params; param_ranges=Dict(), normalise=false, h
     TMAX = Observable(0.0)
     state = Observable(:stop)
     recording = Observable(false)
-    @show symbol_font
     t_slider_grid = SliderGrid(layout.t_slider, (label = "t", range = @lift(0.0:0.01:$TMAX), format = "{:.2f}"))
     t_slider = t_slider_grid.sliders |> only
     play_button = Button(layout.play_button; label=@lift(if $state==:stop "▶" else "⏸" end), font=symbol_font)
@@ -246,9 +245,10 @@ function interactive_plot(model, params; param_ranges=Dict(), normalise=false, h
     on(t_slider.value) do t
         # Hack to distinguish user interaction (large movements) from ticks (small movements).
         # TODO tune this so it works more reliably.
-        isapprox(t, RealT[]; atol=0.05) && return 
-        state[] = :stop
-        RealT[] = t
+        if !isapprox(t, RealT[]; atol=0.1)
+            state[] = :stop
+            RealT[] = t
+        end
     end
 
     on(reset_button.clicks) do _
