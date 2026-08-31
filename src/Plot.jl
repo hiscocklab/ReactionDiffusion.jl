@@ -323,7 +323,7 @@ end
 
 function make_param_sliders(f, param_ranges, params; width=nothing)
     slider_specs = [eltype(v) <: AbstractFloat ? (label=string(k), range = v, startvalue=params[k], format = x -> @sprintf("%.2f",x)) : (label=string(k), range = 1:length(v)) for (k,v) in param_ranges]
-    SliderGrid(f, slider_specs...; width=width)
+    SliderGrid(f, slider_specs...; width=width, tellheight=false)
 end
 
 end
