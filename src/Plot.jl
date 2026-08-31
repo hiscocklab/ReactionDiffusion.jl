@@ -141,6 +141,9 @@ function interactive_plot(model, params; param_ranges=Dict(), normalise=false, h
             range(0.0,2*v,100) # Parameter sliders go from 0 to 2*params by default.
         end
     end
+    if length(tspan)==1
+        tspan = (0.0, tspan)
+    end
     fig = Figure()
     layout = make_layout(fig)
     ax = Axis(layout.ax, title=name(model), xlabel = "x / L", ylabel = "Concentration", yticklabelspace = 50.0)
@@ -177,7 +180,7 @@ function interactive_plot(model, params; param_ranges=Dict(), normalise=false, h
     params = parameter_set(model, Dict(k => x isa Int ? v[x] : x for ((k, v), x) in zip(param_ranges, [p[] for p in P])))
     rng=Xoshiro(seed)
     prob = PseudoSpectralProblem(model, num_verts; p=params, dt, rng, tspan, kwargs...)
-    callback = isinf(tspan) ? steady_state_callback(tol) : nothing # Only stop at steady state if tspan isn't specified.
+    callback = isinf(tspan[end]) ? steady_state_callback(tol) : nothing # Only stop at steady state if tspan isn't specified.
 
     int = Ref(init(prob; callback))
 
@@ -187,10 +190,10 @@ function interactive_plot(model, params; param_ranges=Dict(), normalise=false, h
         int[] = remake(int[]; p=params, rng)
         U[]=f(T[])
     end
-
+    
     RealT = Observable(0.0)
     TT = throttle(1/120, RealT)
-    T = @lift min($TT, int[].ss, tspan)
+    T = @lift min($TT, int[].ss, tspan[end])
     U = lift(f, T)
 
     x = range(0, 1, num_verts)
@@ -230,7 +233,7 @@ function interactive_plot(model, params; param_ranges=Dict(), normalise=false, h
     end
 
     on(T) do t
-        t_end = isinf(tspan) ? int[].ss : tspan
+        t_end = isinf(tspan[end]) ? int[].ss : tspan[end]
         if t >= t_end
             t = t_end
             state[]= :stop
