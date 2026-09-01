@@ -238,7 +238,7 @@ function parameter_set(model, params=Dict())
     set
 end
 
-parameter_set(params::ParameterSet) = params
+parameter_set(model, params::ParameterSet) = params
 
 
 # Constructors for different spatial discretisations
