@@ -14,6 +14,8 @@ Reaction-diffusion dynamics are present across many areas of the physical and na
 - screened across millions of parameter combinations to identify pattern-forming networks (i.e., those that undergo a Turing instability)
 - rapidly simulated to predict spatiotemporal patterns
 
+![interactive plot](./assets/interactive_plot.gif)
+
 ## Quick start guide
 
 Here we show how `ReactionDiffusion.jl` can be used to simulate a biologically-inspired reaction-diffusion system, responsible for generating evenly spaced joints along the length of your fingers and toes (from [Grall et el, 2024](https://www.pnas.org/doi/10.1073/pnas.2304470121)).
