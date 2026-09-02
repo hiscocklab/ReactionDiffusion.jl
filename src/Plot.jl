@@ -12,6 +12,7 @@ using CairoMakie
 using Observables
 using Random: Xoshiro, seed!
 using NativeFileDialog: save_file
+const symbol_font = normpath(@__DIR__, "..", "fonts", "NotoSansSymbols2-Regular.ttf")
 
 
 """
@@ -69,7 +70,7 @@ Simulate and display the results with an interactive slider to move through time
 If `normalise` is true, values for different species will be normalised to a common scale.
 """
 function timeseries_plot(model, params; normalise=false, hide_y=normalise, autolimits=true, species=nothing, kwargs...)
-    sol = simulate(model, params; full_solution = true, kwargs...)
+    sol = simulate(model, params; kwargs...)
     timeseries_plot(model, sol; normalise, hide_y, autolimits, species)
 end
 
@@ -106,7 +107,7 @@ function timeseries_plot(model, u, t; normalise=false, hide_y=normalise, autolim
 	r = normalise ? maximum.(eachslice(u, dims = 2)) : ones(size(u)[2:3]) # find max value for each species across all time
 
 	fig = Figure()
-	ax = Axis(fig[1,1], xlabel = "x / L", ylabel = "Concentration") # TODO have axis labels passed in as kwargs
+	ax = Axis(fig[1,1], xlabel = "x / L", ylabel = "Concentration", yticklabelspace = 50.0) # TODO have axis labels passed in as kwargs
 	hide_y && hideydecorations!(ax;label=false)
     sg = SliderGrid(fig[2,1], (label = "t", range = eachindex(t), format = i -> @sprintf("%.2f", t[i])))
 
@@ -134,10 +135,16 @@ end
 Generate an interactive plot of the steady state solution with sliders to adjust each of the parameters within `param_ranges`.
 `param_ranges` should be a dictionary mapping parameter names to either `Range` objects or collections of possible values.
 """
-function interactive_plot(model, params; param_ranges=nothing, normalise=false, hide_y=normalise, autolimits=true, tspan=Inf64, tol=1e-5, num_verts=32, dt=0.01, seed=123, kwargs...)
+function interactive_plot(model, params; param_ranges=Dict(), normalise=false, hide_y=normalise, autolimits=true, tspan=Inf64, tol=1e-5, num_verts=32, dt=0.01, seed=123, kwargs...)
     params = sort(params)
-    param_ranges = something(param_ranges,
-        Dict(k => range(0.0,2*v,100) for (k,v) in params)) # Parameter sliders go from 0 to 2*params by default.
+    for (k,v) in params
+        get!(param_ranges, k) do
+            range(0.0,2*v,100) # Parameter sliders go from 0 to 2*params by default.
+        end
+    end
+    if length(tspan)==1
+        tspan = (0.0, tspan)
+    end
     fig = Figure()
     layout = make_layout(fig)
     ax = Axis(layout.ax, title=name(model), xlabel = "x / L", ylabel = "Concentration", yticklabelspace = 50.0)
@@ -146,14 +153,13 @@ function interactive_plot(model, params; param_ranges=nothing, normalise=false, 
     TMAX = Observable(0.0)
     state = Observable(:stop)
     recording = Observable(false)
-
     t_slider_grid = SliderGrid(layout.t_slider, (label = "t", range = @lift(0.0:0.01:$TMAX), format = "{:.2f}"))
     t_slider = t_slider_grid.sliders |> only
-    play_button = Button(layout.play_button; label=@lift(if $state==:stop "▶" else "⏸" end), font="Segoe UI Symbol")
-    reset_button = Button(layout.reset_button; label="⏮")
-    skip_button = Button(layout.skip_button; label="⏭", buttoncolor=@lift(if $state==:ff COLOR_ACCENT[] else RGBf(0.94, 0.94, 0.94) end))
-    record_button = Button(layout.record_button; label="⏺", buttoncolor=@lift(if $recording COLOR_ACCENT[] else RGBf(0.94, 0.94, 0.94) end), font="Segoe UI Symbol")
-    capture_button = Button(layout.capture_button; label="📷", font="Segoe UI Symbol")
+    play_button = Button(layout.play_button; label=@lift(if $state==:stop "▶" else "⏸" end), font=symbol_font)
+    reset_button = Button(layout.reset_button; label="⏮", font=symbol_font)
+    skip_button = Button(layout.skip_button; label="⏭", buttoncolor=@lift(if $state==:ff COLOR_ACCENT[] else RGBf(0.94, 0.94, 0.94) end), font=symbol_font)
+    record_button = Button(layout.record_button; label="⏺", buttoncolor=@lift(if $recording COLOR_ACCENT[] else RGBf(0.94, 0.94, 0.94) end), font=symbol_font)
+    capture_button = Button(layout.capture_button; label="📷", font=symbol_font)
 
     
 
@@ -174,7 +180,7 @@ function interactive_plot(model, params; param_ranges=nothing, normalise=false, 
     params = parameter_set(model, Dict(k => x isa Int ? v[x] : x for ((k, v), x) in zip(param_ranges, [p[] for p in P])))
     rng=Xoshiro(seed)
     prob = PseudoSpectralProblem(model, num_verts; p=params, dt, rng, tspan, kwargs...)
-    callback = isinf(tspan) ? steady_state_callback(tol) : nothing # Only stop at steady state if tspan isn't specified.
+    callback = isinf(tspan[end]) ? steady_state_callback(tol) : nothing # Only stop at steady state if tspan isn't specified.
 
     int = Ref(init(prob; callback))
 
@@ -184,10 +190,10 @@ function interactive_plot(model, params; param_ranges=nothing, normalise=false, 
         int[] = remake(int[]; p=params, rng)
         U[]=f(T[])
     end
-
+    
     RealT = Observable(0.0)
     TT = throttle(1/120, RealT)
-    T = @lift min($TT, int[].ss, tspan)
+    T = @lift min($TT, int[].ss, tspan[end])
     U = lift(f, T)
 
     x = range(0, 1, num_verts)
@@ -227,7 +233,7 @@ function interactive_plot(model, params; param_ranges=nothing, normalise=false, 
     end
 
     on(T) do t
-        t_end = isinf(tspan) ? int[].ss : tspan
+        t_end = isinf(tspan[end]) ? int[].ss : tspan[end]
         if t >= t_end
             t = t_end
             state[]= :stop
@@ -239,9 +245,10 @@ function interactive_plot(model, params; param_ranges=nothing, normalise=false, 
     on(t_slider.value) do t
         # Hack to distinguish user interaction (large movements) from ticks (small movements).
         # TODO tune this so it works more reliably.
-        isapprox(t, RealT[]; atol=0.05) && return 
-        state[] = :stop
-        RealT[] = t
+        if !isapprox(t, RealT[]; atol=0.1)
+            state[] = :stop
+            RealT[] = t
+        end
     end
 
     on(reset_button.clicks) do _
@@ -320,7 +327,7 @@ end
 
 function make_param_sliders(f, param_ranges, params; width=nothing)
     slider_specs = [eltype(v) <: AbstractFloat ? (label=string(k), range = v, startvalue=params[k], format = x -> @sprintf("%.2f",x)) : (label=string(k), range = 1:length(v)) for (k,v) in param_ranges]
-    SliderGrid(f, slider_specs...; width=width)
+    SliderGrid(f, slider_specs...; width=width, tellheight=false)
 end
 
 end

@@ -52,6 +52,7 @@ function simulate(model; discretisation=:pseudospectral, seed=nothing, kwargs...
 end
 
 function simulate_pseudospectral(model; output_func=nothing, alg=ETDRK4(), tspan=Inf64, num_verts=64, dt=0.1, max_attempts = 4, tol=1e-5, noise=1e-4, kwargs...)
+    tspan=Float64.(tspan)
     prob = PseudoSpectralProblem(model, num_verts; noise=noise)
 
     f(params) = f([params]).u |> only # Accept a single parameter set instead of a vector.
@@ -82,7 +83,7 @@ function simulate_pseudospectral(model; output_func=nothing, alg=ETDRK4(), tspan
 
         ensemble_prob = EnsembleProblem(prob; prob_func=_prob_func, output_func=_output_func)
         
-        callback = isinf(tspan) ? steady_state_callback(tol) : nothing # Only stop at steady state if tspan isn't specified.
+        callback = isinf(tspan[end]) ? steady_state_callback(tol) : nothing # Only stop at steady state if tspan isn't specified.
         # with_logger(ConsoleLogger(stderr, Error)) do
         solve(ensemble_prob, alg; trajectories=length(params), callback, tspan, kwargs...)
         # end

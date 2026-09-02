@@ -102,10 +102,11 @@ steady_state_plot(model, sol[10], normalise=true)
 Finally we can use the interactive visualisation tool to view the full dynamics over a range of parameter values.
 
 ```julia
-interactive_plot(model, turing_params[10]; dt=0.01, num_verts=128, tspan=700.0, normalise=true)
+interactive_plot(model, turing_params[10]; dt=0.03, num_verts=32, tspan=40.0, normalise=true)
 ```
 ![dynamics](docs/src/assets/interactive_plot.gif)
 
+Note that this animation is generated in real time. The solver is running from 0-t constantly as we move the slider to change the diffusion rate of the GDF5-NOG complex.
 
 
 ## Support, citation and future developments

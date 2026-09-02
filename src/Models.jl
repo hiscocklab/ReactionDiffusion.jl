@@ -17,7 +17,7 @@ export ODESystem
 
 using Symbolics: Num, value, get_variables, @variables, getname, substitute
 import Catalyst # Catalyst.species and Catalyst.parameters would conflict with our functions.
-using Catalyst: numspecies, numparams, assemble_oderhs, @species, @parameters, @reaction_network, ExprValues, get_usexpr, get_psexpr, esc_dollars!, find_parameters_in_rate!, forbidden_symbol_check, DEFAULT_IV_SYM, default_t, setmetadata, ReactionSystem, independent_variable
+using Catalyst: numspecies, numparams, assemble_oderhs, @species, @parameters, @reaction_network, ExprValues, get_usexpr, get_psexpr, esc_dollars!, find_parameters_in_rate!, forbidden_symbol_check, DEFAULT_IV_SYM, default_t, setmetadata, ReactionSystem, independent_variable, recursive_escape_functions!
 import ModelingToolkit # Needed for internal Catalyst functions.
 using ..Util: subst, ensure_function, zip_dict
 using Pipe
@@ -238,7 +238,7 @@ function parameter_set(model, params=Dict())
     set
 end
 
-parameter_set(params::ParameterSet) = params
+parameter_set(model, params::ParameterSet) = params
 
 
 # Constructors for different spatial discretisations
@@ -249,14 +249,17 @@ Construct a SplitODEProblem to solve a reaction diffusion system with reflective
 
 Returns the SplitODEProblem with solutions in the frequency (DCT-1) domain and a FFTW plan to transform solutions back to the spatial domain.
 """
-function PseudoSpectralProblem(model, num_verts; kwargs...)
+function PseudoSpectralProblem(model, num_verts; p=nothing, kwargs...)
+    if !isnothing(p)
+        p=parameter_set(model, p)
+    end
     L = domain_size(model)
     S = species(model)
     R = reaction_rates(model)
     D = diffusion_rates(model)/L^2
-    B = -L * boundary_flux(model) ./ diffusion_rates(model)'
+    B = -L * boundary_flux(model)
     I = initial_conditions(model)
-    PseudoSpectralProblem(S, R, D, B, I, num_verts; kwargs...)
+    PseudoSpectralProblem(S, R, D, B, I, num_verts; p, kwargs...)
 end
                               
 function mol_problem(model, num_verts; noise=1e-4, kwargs...)
@@ -300,6 +303,7 @@ function parse_body(body, source)
 
     for b in body.args
         r, s = b.args
+        recursive_escape_functions!(r) ## test
         # Handle interpolation of variables
         r = parse_expr!(parameters,r)
         s = esc_dollars!(s)
