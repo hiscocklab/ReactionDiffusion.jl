@@ -54,7 +54,7 @@ function steady_state_plot(model, sol::PseudoSpectralSolution; normalise=false, 
 	ax = Axis(fig[1,1], xlabel = "x / L", ylabel = "Concentration") # TODO have axis labels passed in as kwargs
 	hide_y && hideydecorations!(ax; label=false)
 	for (u, label) in zip(u, labels)
-		lines!(ax, x, u; label)
+		lines!(ax, x, u; label, linewidth=4)
 	end
 
 	autolimits!(ax)
@@ -115,7 +115,7 @@ function timeseries_plot(model, u, t; normalise=false, hide_y=normalise, autolim
 	T = lift(i -> t[i], sl.value)
 	U = [lift(i -> u[:, i] / r, sl.value) for (u, r) in zip(eachslice(u, dims = 2), r)]
 	for (U, label) in zip(U, labels)
-		lines!(ax, x, U, label = label)
+		lines!(ax, x, U, label = label, linewidth=4)
 	end
 
     if autolimits
@@ -199,7 +199,7 @@ function interactive_plot(model, params; param_ranges=Dict(), normalise=false, h
     x = range(0, 1, num_verts)
     labels = [string(s.f) for s in species(model)]
     for i in eachindex(eachcol(U[]))
-        lines!(ax, x, lift(u -> u[:, i], U); label=labels[i])
+        lines!(ax, x, lift(u -> u[:, i], U); label=labels[i], linewidth=4)
     end
 
     if autolimits
@@ -274,7 +274,7 @@ function interactive_plot(model, params; param_ranges=Dict(), normalise=false, h
         export_fig = Figure()
         export_ax = Axis(export_fig[1, 1]; title=ax.title[], xlabel=ax.xlabel[], ylabel=ax.ylabel[])
         for i in eachindex(eachcol(U[]))
-            lines!(export_ax, x, U[][:, i]; label=labels[i])
+            lines!(export_ax, x, U[][:, i]; label=labels[i], linewidth=4)
         end
         save(filename, export_fig; backend=CairoMakie)
         nothing
@@ -295,7 +295,7 @@ function interactive_plot(model, params; param_ranges=Dict(), normalise=false, h
         export_fig = Figure()
         export_ax = Axis(export_fig[1, 1]; title=ax.title[], xlabel=ax.xlabel[], ylabel=ax.ylabel[])
         for i in eachindex(eachcol(U[]))
-            lines!(export_ax, x, lift(u -> u[:, i], U); label=labels[i])
+            lines!(export_ax, x, lift(u -> u[:, i], U); label=labels[i], linewidth=4)
         end
 
         video[] = VideoStream(export_fig; backend=CairoMakie)
