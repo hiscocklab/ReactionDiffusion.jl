@@ -39,8 +39,8 @@ params = dict(
     D₁ = 1.0,
     D₂ = 1.0,
     D₃ = 30.0,
-    L  = 45.0
+    L  = 25.0
 )
 
 
-interactive_plot(model, params; dt=0.01, num_verts=64, tspan=700, normalise=true)
+interactive_plot(model, params; dt=0.02, num_verts=64, tspan=700, normalise=true)
