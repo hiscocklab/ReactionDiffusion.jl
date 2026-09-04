@@ -14,4 +14,7 @@ For a fully interactive simulation, use the `interactive_plot` tool. This will a
 interactive_plot(model, params)
 ```
 
-Each parameter in `param_ranges` can be adjusted within the given range using the sliders. Here we provide a range of functions for μ₂ which produce varying spatial gradients.
+You can optionally pass ranges of possible values for some or all of the paramters.
+```julia
+interactive_plot(model, params; param_ranges=dict(μ₁ = range(0.1,10.0,100), μ₂ = range(0.1,10.0,5)))
+```
