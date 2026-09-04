@@ -94,12 +94,7 @@ timeseries_plot(model,turing_params[4])
 Or view the results of adjusting parameters of interest in real time.
 
 ```julia
-param_ranges = dict(
-    μ₁ = range(0.5,2.0,100),
-    μ₂ = [x->exp(-λ*x) for λ in range(1.0,10.0,100)],
-    D₃ = range(1.0,100.0,100)
-)
-interactive_plot(model, param_ranges)
+interactive_plot(model, turing_params[4])
 ```
 
 We take advantage of psuedo-spectral methods in combination with the highly performant numerical solvers in [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl) to be able to simulate millions of parameter sets per minute on a standard laptop. 

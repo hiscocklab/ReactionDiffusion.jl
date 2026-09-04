@@ -2,9 +2,6 @@
 using ReactionDiffusion, WGLMakie
 WGLMakie.activate!(resize_to=:body) # Make plots fill the available space.
 
-anterior = <(1/12)
-posterior = >(11/12)
-
 ## Define a reaction network.
 reaction = @reaction_network begin
     δ_bcd,                      BCD --> ∅   # Bicod degredation
@@ -65,4 +62,4 @@ param_ranges = dict(
 
 
 
-fig=interactive_plot(model, param_ranges; dt=0.01, num_verts=32)
+fig=interactive_plot(model, params; param_ranges, dt=0.01, num_verts=32)

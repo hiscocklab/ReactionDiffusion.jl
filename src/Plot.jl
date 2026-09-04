@@ -136,12 +136,12 @@ Generate an interactive plot of the steady state solution with sliders to adjust
 `param_ranges` should be a dictionary mapping parameter names to either `Range` objects or collections of possible values.
 """
 function interactive_plot(model, params; param_ranges=Dict(), normalise=false, hide_y=normalise, autolimits=true, tspan=Inf64, tol=1e-5, num_verts=32, dt=0.01, seed=123, kwargs...)
-    params = sort(params)
     for (k,v) in params
         get!(param_ranges, k) do
             range(0.0,2*v,100) # Parameter sliders go from 0 to 2*params by default.
         end
     end
+    param_ranges=sort(collect(param_ranges), by=first)
     if length(tspan)==1
         tspan = (0.0, tspan)
     end
