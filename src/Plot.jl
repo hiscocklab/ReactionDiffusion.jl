@@ -21,9 +21,9 @@ const symbol_font = normpath(@__DIR__, "..", "fonts", "NotoSansSymbols2-Regular.
 Run a simulation and plot the final values for each species.
 If `normalise` is true, values for different species will be normalised to a common scale.
 """
-function steady_state_plot(model, params; normalise=false, hide_y=normalise, kwargs...)
+function steady_state_plot(model, params; normalise=false, hide_y=normalise, species=nothing, kwargs...)
     sol = simulate(model,params; kwargs...)
-    steady_state_plot(model,sol; normalise, hide_y)
+    steady_state_plot(model,sol; normalise, hide_y, species)
 end
 
 """
