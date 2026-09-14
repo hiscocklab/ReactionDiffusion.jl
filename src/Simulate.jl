@@ -16,7 +16,7 @@ using Symbolics:Num #temp
 
 using Logging: with_logger, ConsoleLogger, stderr, Error
 using Pipe: @pipe
-using Random: seed!
+using Random: Xoshiro
 """
     simulate(model, params; output_func=nothing, full_solution=false, alg=ETDRK4(), num_verts=64, dt=0.1, max_attempts = 4, tol=1e-4, kwargs...)
 
@@ -41,7 +41,6 @@ simulate(model, params; kwargs...) = simulate(model; kwargs...)(params)
 Partially applied version of `simulate` to avoid repeating expensive setup when simulating the same model reapeatedly.
 """
 function simulate(model; discretisation=:pseudospectral, seed=nothing, kwargs...)
-    seed!(seed)
     if discretisation==:pseudospectral
         simulate_pseudospectral(model; kwargs...)
     elseif discretisation==:mol
@@ -51,9 +50,10 @@ function simulate(model; discretisation=:pseudospectral, seed=nothing, kwargs...
     end
 end
 
-function simulate_pseudospectral(model; output_func=nothing, alg=ETDRK4(), tspan=Inf64, num_verts=64, dt=0.1, max_attempts = 4, tol=1e-5, noise=1e-4, kwargs...)
+function simulate_pseudospectral(model; output_func=nothing, alg=ETDRK4(), tspan=Inf64, num_verts=64, dt=0.1, max_attempts = 4, tol=1e-5, noise=1e-4, seed=nothing, kwargs...)
     tspan=Float64.(tspan)
-    prob = PseudoSpectralProblem(model, num_verts; noise=noise)
+    rng = Xoshiro(seed)
+    prob = PseudoSpectralProblem(model, num_verts; noise, rng)
 
     f(params) = f([params]).u |> only # Accept a single parameter set instead of a vector.
     f(params::AbstractVector) = f(parameter_set.(model, params))
