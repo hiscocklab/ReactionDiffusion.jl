@@ -63,12 +63,11 @@ function simulate_pseudospectral(model; output_func=nothing, alg=ETDRK4(), tspan
         progress = Progress(length(params); desc="Simulating parameter sets: ", dt=0.1, barglyphs=BarGlyphs("[=> ]"), barlen=50, color=:yellow)
 
         function _output_func(sol,ctx)
+            out = isnothing(output_func) ? sol : output_func(sol)
             if successful_retcode(sol)
-                out = isnothing(output_func) ? sol : output_func(sol)
                 repeat = false
                 next!(progress) # Advance progress bar.
             else
-                out = missing
                 repeat = ctx.repeat < max_attempts
             end
             (out, repeat)
