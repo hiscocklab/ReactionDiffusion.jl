@@ -1,6 +1,6 @@
 name = "ReactionDiffusion"
 uuid = "dcda7c7e-49c0-481c-982d-c35bedad83cd"
-version = "1.0.2"
+version = "1.0.3"
 authors = ["Tom W. Hiscock", "Hugh Coleman"]
 
 [workspace]
@@ -49,7 +49,7 @@ OrdinaryDiffEqSDIRK = "2.8.2"
 Pipe = "1.3.0"
 Printf = "1.11.0"
 ProgressMeter = "1.11.0"
-PseudoSpectralReactionDiffusion = "1.0.4"
+PseudoSpectralReactionDiffusion = "1.0.6"
 Random = "1.11.0"
 Reexport = "1.2.2"
 SciMLBase = "3.49.1"
