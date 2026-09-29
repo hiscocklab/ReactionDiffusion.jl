@@ -50,10 +50,10 @@ function simulate(model; discretisation=:pseudospectral, seed=nothing, kwargs...
     end
 end
 
-function simulate_pseudospectral(model; output_func=nothing, alg=ETDRK4(), tspan=Inf64, num_verts=64, dt=0.1, max_attempts = 4, tol=1e-5, noise=1e-4, seed=nothing, kwargs...)
+function simulate_pseudospectral(model; output_func=nothing, alg=ETDRK4(), tspan=Inf64, num_verts=64, dt=0.1, max_attempts = 4, tol=1e-5, noise=1e-4, dealias=true, seed=nothing, kwargs...)
     tspan=Float64.(tspan)
     rng = Xoshiro(seed)
-    prob = PseudoSpectralProblem(model, num_verts; noise, rng)
+    prob = PseudoSpectralProblem(model, num_verts; noise, rng, dealias)
 
     f(params) = f([params]).u |> only # Accept a single parameter set instead of a vector.
     f(params::AbstractVector) = f(parameter_set.(model, params))
