@@ -81,8 +81,8 @@ end
 end
 
 @testset "boundary conditions" begin
-    b0 = @reaction_network begin g0, ∅ --> U end
-    b1 = @reaction_network begin g1, ∅ --> U end 
+    b0 = @reaction_network begin J0, ∅ --> U end
+    b1 = @reaction_network begin J1, ∅ --> U end 
     initial = @initial_conditions begin
         x^2 * (g1-g0)/2 + x * g0, U
         0, V
@@ -90,12 +90,12 @@ end
     model = Model(Schnakenberg.reaction, Schnakenberg.diffusion, (b0,b1), initial)
     L = 100.0
     n=256
-    params = dict(a = 0.2, b = 2.0, γ = 1.0, Dᵤ = 1.0, Dᵥ = 50.0, L=L, r=0.1, g0=0.1, g1=0.2)
+    params = dict(a = 0.2, b = 2.0, γ = 1.0, Dᵤ = 1.0, Dᵥ = 50.0, L=L, r=0.1, J0=0.1, J1=0.2)
     sol = simulate(model, params; tspan=5.0, num_verts=n, dt=0.01)
     u=sol[U][end]
     h = L/n
-    @test (u[2] - u[1])/h  ≈ -0.1 rtol=0.5 # Check it's pointing vaguely in the right direction.
-    @test (u[end] - u[end-1])/h ≈ 0.2  rtol=0.5 
+    @test (u[2] - u[1])/h  ≈ -params[:J0]/D rtol=0.5 # Check it's pointing vaguely in the right direction.
+    @test (u[end] - u[end-1])/h ≈ params[:J1]/D rtol=0.5 
 end
 
 end;

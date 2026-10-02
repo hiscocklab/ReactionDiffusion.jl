@@ -257,7 +257,7 @@ function PseudoSpectralProblem(model, num_verts; p=nothing, kwargs...)
     S = species(model)
     R = reaction_rates(model)
     D = diffusion_rates(model)/L^2
-    B = -L * boundary_flux(model)
+    B = -boundary_flux(model)./(L*D')
     I = initial_conditions(model)
     PseudoSpectralProblem(S, R, D, B, I, num_verts; p, kwargs...)
 end
