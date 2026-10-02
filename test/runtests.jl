@@ -94,8 +94,8 @@ end
     sol = simulate(model, params; tspan=5.0, num_verts=n, dt=0.01)
     u=sol[U][end]
     h = L/n
-    @test (u[2] - u[1])/h  ≈ -params[:J0]/D rtol=0.5 # Check it's pointing vaguely in the right direction.
-    @test (u[end] - u[end-1])/h ≈ params[:J1]/D rtol=0.5 
+    @test (u[2] - u[1])/h  ≈ -params[:J0]/params[:Dᵤ] rtol=0.5 # Check it's pointing vaguely in the right direction.
+    @test (u[end] - u[end-1])/h ≈ params[:J1]/params[:Dᵤ] rtol=0.5 
 end
 
 end;

@@ -15,7 +15,7 @@ import ModelingToolkit: ODESystem
 export ODESystem
 ##
 
-using Symbolics: Num, value, get_variables, @variables, getname, substitute
+using Symbolics: Num, value, get_variables, @variables, getname, substitute, scalarize
 import Catalyst # Catalyst.species and Catalyst.parameters would conflict with our functions.
 using Catalyst: numspecies, numparams, assemble_oderhs, @species, @parameters, @reaction_network, ExprValues, get_usexpr, get_psexpr, esc_dollars!, find_parameters_in_rate!, forbidden_symbol_check, DEFAULT_IV_SYM, default_t, setmetadata, ReactionSystem, independent_variable, recursive_escape_functions!
 import ModelingToolkit # Needed for internal Catalyst functions.
@@ -257,7 +257,7 @@ function PseudoSpectralProblem(model, num_verts; p=nothing, kwargs...)
     S = species(model)
     R = reaction_rates(model)
     D = diffusion_rates(model)/L^2
-    B = -boundary_flux(model)./(L*D')
+    B = -boundary_flux(model)./(L*D') |> scalarize .|> Num
     I = initial_conditions(model)
     PseudoSpectralProblem(S, R, D, B, I, num_verts; p, kwargs...)
 end
