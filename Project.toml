@@ -34,7 +34,7 @@ WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 
 [compat]
 CairoMakie = "0.15.13"
-Catalyst = "16.3.0"
+Catalyst = "16.3.0, 17.0"
 FFTW = "1.10.0"
 Groebner = "0.10.6"
 LinearAlgebra = "1.12.0"
